@@ -12,6 +12,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.redis.core.ListOperations;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -28,6 +30,12 @@ class EventComponentsTest {
 
     @Mock
     private KafkaTemplate<String, Object> kafkaTemplate;
+
+    @Mock
+    private StringRedisTemplate stringRedisTemplate;
+
+    @Mock
+    private ListOperations<String, String> listOperations;
 
     @Mock
     private RecentEventsTracker eventsTracker;
@@ -78,6 +86,72 @@ class EventComponentsTest {
         List<StreamEventDto> events = tracker.getRecentEvents();
         assertEquals(50, events.size());
         assertEquals("key-60", events.get(0).getKey()); // most recent is first
+    }
+
+    @Test
+    @DisplayName("RecentEventsTracker should push to Redis and retrieve from Redis when available")
+    void testRecentEventsTrackerWithRedis() throws Exception {
+        when(stringRedisTemplate.opsForList()).thenReturn(listOperations);
+        RecentEventsTracker tracker = new RecentEventsTracker(stringRedisTemplate, objectMapper);
+
+        tracker.recordEvent("topic-1", 0, 10L, "key-10", "payload-10");
+        verify(listOperations).leftPush(eq("indibank:events:recent"), anyString());
+        verify(listOperations).trim(eq("indibank:events:recent"), eq(0L), eq(49L));
+
+        StreamEventDto mockDto = StreamEventDto.builder()
+                .topic("topic-1")
+                .partition(0)
+                .offset(10L)
+                .key("key-10")
+                .payload("payload-10")
+                .timestamp(Instant.now())
+                .build();
+        String json = objectMapper.writeValueAsString(mockDto);
+        when(listOperations.range(eq("indibank:events:recent"), eq(0L), eq(49L)))
+                .thenReturn(List.of(json));
+
+        List<StreamEventDto> retrieved = tracker.getRecentEvents();
+        assertEquals(1, retrieved.size());
+        assertEquals("key-10", retrieved.get(0).getKey());
+    }
+
+    @Test
+    @DisplayName("RecentEventsTracker should handle Redis exceptions gracefully on push and get")
+    void testRecentEventsTrackerRedisExceptions() {
+        when(stringRedisTemplate.opsForList()).thenReturn(listOperations);
+        doThrow(new RuntimeException("Redis connection refused"))
+                .when(listOperations).leftPush(anyString(), anyString());
+
+        RecentEventsTracker tracker = new RecentEventsTracker(stringRedisTemplate, objectMapper);
+        assertDoesNotThrow(() -> tracker.recordEvent("topic-1", 0, 1L, "k-1", "p-1"));
+
+        // When Redis get fails, fallback to in-memory
+        when(listOperations.range(anyString(), anyLong(), anyLong()))
+                .thenThrow(new RuntimeException("Redis read timeout"));
+        List<StreamEventDto> events = tracker.getRecentEvents();
+        assertEquals(1, events.size());
+        assertEquals("k-1", events.get(0).getKey());
+    }
+
+    @Test
+    @DisplayName("RecentEventsTracker should fallback to in-memory when Redis returns empty or null")
+    void testRecentEventsTrackerRedisEmptyListFallback() {
+        when(stringRedisTemplate.opsForList()).thenReturn(listOperations);
+        RecentEventsTracker tracker = new RecentEventsTracker(stringRedisTemplate, objectMapper);
+        tracker.recordEvent("topic-1", 0, 1L, "k-empty", "p-empty");
+
+        when(listOperations.range(eq("indibank:events:recent"), eq(0L), eq(49L)))
+                .thenReturn(List.of());
+
+        List<StreamEventDto> events = tracker.getRecentEvents();
+        assertEquals(1, events.size());
+        assertEquals("k-empty", events.get(0).getKey());
+
+        when(listOperations.range(eq("indibank:events:recent"), eq(0L), eq(49L)))
+                .thenReturn(null);
+        List<StreamEventDto> eventsNull = tracker.getRecentEvents();
+        assertEquals(1, eventsNull.size());
+        assertEquals("k-empty", eventsNull.get(0).getKey());
     }
 
     @Test

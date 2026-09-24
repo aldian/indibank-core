@@ -47,14 +47,34 @@
             100% { opacity: 1; }
         }
         .kafka-feed {
-            max-height: 380px;
+            max-height: 420px;
             overflow-y: auto;
-            background: #1e1e1e;
-            color: #00ff66;
-            font-family: "Courier New", Courier, monospace;
+            background: #0b1329;
+            color: #e2e8f0;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
             font-size: 0.82rem;
-            padding: 12px;
+            padding: 14px;
             border-radius: 8px;
+            border: 1px solid #1e293b;
+            box-shadow: inset 0 2px 6px rgba(0,0,0,0.4);
+        }
+        .kafka-item {
+            background: #152238;
+            border: 1px solid #233554;
+            border-radius: 6px;
+            padding: 10px 12px;
+            margin-bottom: 10px;
+        }
+        .kafka-json {
+            background: #070d1e;
+            color: #38bdf8;
+            padding: 8px 10px;
+            border-radius: 4px;
+            font-size: 0.78rem;
+            margin-top: 6px;
+            border: 1px solid #1e293b;
+            white-space: pre-wrap;
+            word-break: break-all;
         }
         .tech-pill {
             font-size: 0.75rem;
@@ -154,15 +174,18 @@
                     <div class="mb-3">
                         <label class="form-label fw-semibold small text-muted">Amount (IDR)</label>
                         <div class="input-group">
-                            <span class="input-group-text bg-light text-muted">Rp</span>
-                            <input type="number" class="form-control" id="transferAmount" value="5000000" min="1000" step="50000" required>
+                            <span class="input-group-text bg-light fw-bold text-dark">Rp</span>
+                            <input type="text" class="form-control fw-bold" id="transferAmount" value="5.000.000" placeholder="e.g. 5.000.000 or 25000000" required autocomplete="off">
                         </div>
-                        <div class="d-flex gap-2 mt-2">
-                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="setAmount(5000000)">5 Juta</button>
-                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="setAmount(25000000)">25 Juta</button>
-                            <button type="button" class="btn btn-sm btn-outline-danger" onclick="setAmount(150000000)">
-                                🚨 150 Juta (Triggers AML)
-                            </button>
+                        <div class="d-flex justify-content-between align-items-center mt-1">
+                            <small class="text-primary fw-semibold font-monospace" id="amountFormattedText">Rp 5.000.000,00</small>
+                            <div class="d-flex gap-1">
+                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="setAmount(5000000)">5 Juta</button>
+                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="setAmount(25000000)">25 Juta</button>
+                                <button type="button" class="btn btn-sm btn-outline-danger" onclick="setAmount(150000000)">
+                                    🚨 150 Juta (AML)
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -222,11 +245,19 @@
                     <h5 class="fw-bold text-dark mb-0">
                         <i class="bi bi-broadcast text-danger me-2"></i>Live Kafka Event Stream
                     </h5>
-                    <span class="badge bg-secondary font-monospace" id="eventCount">0 events</span>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-success-subtle text-success border border-success font-monospace" style="font-size: 0.72rem;">
+                            <i class="bi bi-circle-fill text-success me-1" style="font-size: 0.5rem;"></i>CONNECTED
+                        </span>
+                        <span class="badge bg-primary font-monospace" id="eventCount">0 events</span>
+                    </div>
                 </div>
                 <p class="small text-muted mb-2">Real-time consumer receiving settlement events and asynchronous AML fraud triggers.</p>
                 <div class="kafka-feed" id="kafkaEventsFeed">
-                    <div>[System] Connecting to Kafka event stream...</div>
+                    <div class="d-flex align-items-center text-info py-2">
+                        <span class="spinner-grow spinner-grow-sm text-info me-2" role="status"></span>
+                        <span class="font-monospace">[System] Connecting to Kafka event stream...</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -247,9 +278,37 @@
         document.getElementById('idempotencyKey').value = generateUUID();
     }
 
-    function setAmount(val) {
-        document.getElementById('transferAmount').value = val;
+    function formatNumber(num) {
+        return new Intl.NumberFormat('id-ID').format(num);
     }
+
+    function parseAmount(val) {
+        if (typeof val === 'number') return val;
+        if (!val) return 0;
+        const clean = val.toString().replace(/[^0-9]/g, '');
+        return clean ? parseFloat(clean) : 0;
+    }
+
+    function setAmount(val) {
+        document.getElementById('transferAmount').value = formatNumber(val);
+        updateAmountPreview();
+    }
+
+    function updateAmountPreview() {
+        const parsed = parseAmount(document.getElementById('transferAmount').value);
+        const preview = document.getElementById('amountFormattedText');
+        if (parsed >= 1000) {
+            preview.textContent = 'Rp ' + formatNumber(parsed) + ',00';
+            preview.className = parsed >= 100000000 ? 'text-danger fw-bold font-monospace' : 'text-primary fw-semibold font-monospace';
+        } else {
+            preview.textContent = 'Min. Rp 1.000';
+            preview.className = 'text-warning fw-semibold font-monospace';
+        }
+    }
+
+    document.getElementById('transferAmount').addEventListener('input', function() {
+        updateAmountPreview();
+    });
 
     async function loadAccounts() {
         try {
@@ -281,20 +340,36 @@
             document.getElementById('eventCount').textContent = events.length + ' events';
 
             if (events.length === 0) {
-                feed.innerHTML = '<div class="text-muted">[Kafka] Stream idle. Trigger a transfer to watch real-time events.</div>';
+                feed.innerHTML = `
+                    <div class="py-3 px-2 text-center">
+                        <div class="d-inline-flex align-items-center text-info mb-1 fw-semibold font-monospace">
+                            <span class="spinner-grow spinner-grow-sm text-info me-2" role="status"></span>
+                            <span>[Kafka KRaft Stream Listening]</span>
+                        </div>
+                        <div class="text-light opacity-75 small font-monospace mt-1">
+                            Awaiting new settlement events from Kafka broker.<br>
+                            Trigger a transfer on the left to watch events stream into this terminal!
+                        </div>
+                    </div>
+                `;
                 return;
             }
 
             feed.innerHTML = events.map(evt => {
                 const isFraud = evt.topic.includes('fraud');
                 const badgeClass = isFraud ? 'badge-fraud' : 'badge-settled';
+                const badgeIcon = isFraud ? 'bi-shield-exclamation' : 'bi-check-circle-fill';
                 const time = new Date(evt.timestamp).toLocaleTimeString();
                 return `
-                    <div class="mb-2 pb-2 border-bottom border-secondary">
-                        <span class="badge ${badgeClass}">${evt.topic}</span>
-                        <span class="text-light opacity-50 ms-1">[P:${evt.partition} Off:${evt.offset}]</span>
-                        <span class="text-warning float-end">${time}</span>
-                        <div class="mt-1 text-light font-monospace" style="word-break: break-all;">
+                    <div class="kafka-item">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <div>
+                                <span class="badge ${badgeClass} font-monospace"><i class="bi ${badgeIcon} me-1"></i>${evt.topic}</span>
+                                <span class="text-info font-monospace ms-1 small">[P:${evt.partition} Off:${evt.offset}]</span>
+                            </div>
+                            <span class="badge bg-dark text-warning border border-secondary font-monospace">${time}</span>
+                        </div>
+                        <div class="kafka-json font-monospace">
                             ${JSON.stringify(evt.payload, null, 2)}
                         </div>
                     </div>
@@ -312,10 +387,17 @@
 
     async function submitTransfer() {
         const idempKey = document.getElementById('idempotencyKey').value;
+        const parsedAmount = parseAmount(document.getElementById('transferAmount').value);
+
+        if (parsedAmount < 1000) {
+            alert("Minimum transfer amount is Rp 1,000");
+            return;
+        }
+
         const payload = {
             sourceAccountNumber: document.getElementById('sourceAccount').value,
             destinationAccountNumber: document.getElementById('destAccount').value,
-            amount: parseFloat(document.getElementById('transferAmount').value),
+            amount: parsedAmount,
             currency: 'IDR',
             description: document.getElementById('transferDesc').value
         };
