@@ -179,4 +179,201 @@ class TransferServiceTest {
         verify(lockService).releaseLock(eq("1001002001"), eq("lock-token-abc"));
         verify(idempotencyService).releaseKey(eq(idempKey));
     }
+
+    @Test
+    @DisplayName("Should reject when concurrent transfer request is in-progress")
+    void shouldRejectWhenConcurrentRequestInProgress() {
+        String idempKey = "in-progress-key";
+        TransferRequestDto request = TransferRequestDto.builder()
+                .sourceAccountNumber("1001002001")
+                .destinationAccountNumber("1001002002")
+                .amount(new BigDecimal("1000.00"))
+                .build();
+
+        when(idempotencyService.checkAndLock(eq(idempKey), any()))
+                .thenReturn(new IdempotencyResult(IdempotencyStatus.IN_PROGRESS, null));
+
+        assertThrows(IllegalStateException.class, () -> transferService.processTransfer(idempKey, request));
+    }
+
+    @Test
+    @DisplayName("Should reject when source and destination accounts are identical")
+    void shouldRejectWhenSameAccount() {
+        String idempKey = "same-acc-key";
+        TransferRequestDto request = TransferRequestDto.builder()
+                .sourceAccountNumber("1001002001")
+                .destinationAccountNumber("1001002001")
+                .amount(new BigDecimal("1000.00"))
+                .build();
+
+        when(idempotencyService.checkAndLock(eq(idempKey), any()))
+                .thenReturn(new IdempotencyResult(IdempotencyStatus.ACQUIRED, null));
+
+        assertThrows(IllegalArgumentException.class, () -> transferService.processTransfer(idempKey, request));
+        verify(idempotencyService).releaseKey(eq(idempKey));
+    }
+
+    @Test
+    @DisplayName("Should reject when distributed lock acquisition fails")
+    void shouldRejectWhenLockAcquisitionFails() {
+        String idempKey = "lock-fail-key";
+        TransferRequestDto request = TransferRequestDto.builder()
+                .sourceAccountNumber("1001002001")
+                .destinationAccountNumber("1001002002")
+                .amount(new BigDecimal("1000.00"))
+                .build();
+
+        when(idempotencyService.checkAndLock(eq(idempKey), any()))
+                .thenReturn(new IdempotencyResult(IdempotencyStatus.ACQUIRED, null));
+        when(lockService.acquireLock(eq("1001002001"), any())).thenReturn(null);
+
+        assertThrows(IllegalStateException.class, () -> transferService.processTransfer(idempKey, request));
+        verify(idempotencyService).releaseKey(eq(idempKey));
+    }
+
+    @Test
+    @DisplayName("Should reject when source account is not found")
+    void shouldRejectWhenSourceAccountNotFound() {
+        String idempKey = "src-not-found-key";
+        TransferRequestDto request = TransferRequestDto.builder()
+                .sourceAccountNumber("1001002001")
+                .destinationAccountNumber("1001002002")
+                .amount(new BigDecimal("1000.00"))
+                .build();
+
+        when(idempotencyService.checkAndLock(eq(idempKey), any()))
+                .thenReturn(new IdempotencyResult(IdempotencyStatus.ACQUIRED, null));
+        when(lockService.acquireLock(eq("1001002001"), any())).thenReturn("lock-1");
+        when(accountRepository.findByAccountNumber("1001002001")).thenReturn(Optional.empty());
+
+        assertThrows(java.util.NoSuchElementException.class, () -> transferService.processTransfer(idempKey, request));
+        verify(lockService).releaseLock(eq("1001002001"), eq("lock-1"));
+        verify(idempotencyService).releaseKey(eq(idempKey));
+    }
+
+    @Test
+    @DisplayName("Should reject when destination account is not found")
+    void shouldRejectWhenDestAccountNotFound() {
+        String idempKey = "dst-not-found-key";
+        TransferRequestDto request = TransferRequestDto.builder()
+                .sourceAccountNumber("1001002001")
+                .destinationAccountNumber("1001002002")
+                .amount(new BigDecimal("1000.00"))
+                .build();
+
+        when(idempotencyService.checkAndLock(eq(idempKey), any()))
+                .thenReturn(new IdempotencyResult(IdempotencyStatus.ACQUIRED, null));
+        when(lockService.acquireLock(eq("1001002001"), any())).thenReturn("lock-1");
+        when(accountRepository.findByAccountNumber("1001002001")).thenReturn(Optional.of(sourceAccount));
+        when(accountRepository.findByAccountNumber("1001002002")).thenReturn(Optional.empty());
+
+        assertThrows(java.util.NoSuchElementException.class, () -> transferService.processTransfer(idempKey, request));
+        verify(lockService).releaseLock(eq("1001002001"), eq("lock-1"));
+        verify(idempotencyService).releaseKey(eq(idempKey));
+    }
+
+    @Test
+    @DisplayName("Should reject when source account is not active")
+    void shouldRejectWhenSourceAccountInactive() {
+        String idempKey = "src-inactive-key";
+        TransferRequestDto request = TransferRequestDto.builder()
+                .sourceAccountNumber("1001002001")
+                .destinationAccountNumber("1001002002")
+                .amount(new BigDecimal("1000.00"))
+                .build();
+
+        sourceAccount.setStatus(AccountStatus.FROZEN);
+        when(idempotencyService.checkAndLock(eq(idempKey), any()))
+                .thenReturn(new IdempotencyResult(IdempotencyStatus.ACQUIRED, null));
+        when(lockService.acquireLock(eq("1001002001"), any())).thenReturn("lock-1");
+        when(accountRepository.findByAccountNumber("1001002001")).thenReturn(Optional.of(sourceAccount));
+        when(accountRepository.findByAccountNumber("1001002002")).thenReturn(Optional.of(destAccount));
+
+        assertThrows(IllegalStateException.class, () -> transferService.processTransfer(idempKey, request));
+    }
+
+    @Test
+    @DisplayName("Should reject when destination account is not active")
+    void shouldRejectWhenDestAccountInactive() {
+        String idempKey = "dst-inactive-key";
+        TransferRequestDto request = TransferRequestDto.builder()
+                .sourceAccountNumber("1001002001")
+                .destinationAccountNumber("1001002002")
+                .amount(new BigDecimal("1000.00"))
+                .build();
+
+        destAccount.setStatus(AccountStatus.DORMANT);
+        when(idempotencyService.checkAndLock(eq(idempKey), any()))
+                .thenReturn(new IdempotencyResult(IdempotencyStatus.ACQUIRED, null));
+        when(lockService.acquireLock(eq("1001002001"), any())).thenReturn("lock-1");
+        when(accountRepository.findByAccountNumber("1001002001")).thenReturn(Optional.of(sourceAccount));
+        when(accountRepository.findByAccountNumber("1001002002")).thenReturn(Optional.of(destAccount));
+
+        assertThrows(IllegalStateException.class, () -> transferService.processTransfer(idempKey, request));
+    }
+
+    @Test
+    @DisplayName("Should query transfer by reference successfully")
+    void shouldQueryTransferByReference() {
+        Transfer transfer = Transfer.builder()
+                .id(1L)
+                .transferReference("TRX-20260924-0001")
+                .idempotencyKey("uuid-query")
+                .status(com.indibank.core.domain.model.TransferStatus.SETTLED)
+                .sourceAccount(sourceAccount)
+                .destinationAccount(destAccount)
+                .amount(new BigDecimal("50000.00"))
+                .currency("IDR")
+                .description("Test description")
+                .journalEntryId(99L)
+                .build();
+
+        when(transferRepository.findByTransferReference("TRX-20260924-0001")).thenReturn(Optional.of(transfer));
+
+        TransferResponseDto result = transferService.getTransferByReference("TRX-20260924-0001");
+
+        assertNotNull(result);
+        assertEquals("TRX-20260924-0001", result.getReferenceNumber());
+        assertEquals("uuid-query", result.getIdempotencyKey());
+    }
+
+    @Test
+    @DisplayName("Should throw NoSuchElementException when transfer reference not found")
+    void shouldThrowWhenTransferNotFound() {
+        when(transferRepository.findByTransferReference("TRX-NONE")).thenReturn(Optional.empty());
+
+        assertThrows(java.util.NoSuchElementException.class, () -> transferService.getTransferByReference("TRX-NONE"));
+    }
+
+    @Test
+    @DisplayName("Should handle Kafka publish exception gracefully and complete transfer")
+    void shouldHandleKafkaPublishExceptionGracefully() {
+        String idempKey = "kafka-fail-key";
+        TransferRequestDto request = TransferRequestDto.builder()
+                .sourceAccountNumber("1001002001")
+                .destinationAccountNumber("1001002002")
+                .amount(new BigDecimal("1000.00"))
+                .currency("IDR")
+                .build();
+
+        when(idempotencyService.checkAndLock(eq(idempKey), any()))
+                .thenReturn(new IdempotencyResult(IdempotencyStatus.ACQUIRED, null));
+        when(lockService.acquireLock(eq("1001002001"), any())).thenReturn("lock-token-k");
+        when(accountRepository.findByAccountNumber("1001002001")).thenReturn(Optional.of(sourceAccount));
+        when(accountRepository.findByAccountNumber("1001002002")).thenReturn(Optional.of(destAccount));
+        when(transferRepository.save(any(Transfer.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(journalEntryRepository.save(any(JournalEntry.class))).thenAnswer(inv -> {
+            JournalEntry j = inv.getArgument(0);
+            j.setId(88L);
+            return j;
+        });
+        doThrow(new RuntimeException("Kafka unreachable")).when(eventProducer).publishTransferSettled(any());
+
+        TransferResponseDto response = transferService.processTransfer(idempKey, request);
+
+        assertNotNull(response);
+        verify(lockService).releaseLock(eq("1001002001"), eq("lock-token-k"));
+        verify(idempotencyService).markCompleted(eq(idempKey), any(), any());
+    }
 }
+
