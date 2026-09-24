@@ -1,0 +1,191 @@
+# IndiBank Core Transaction & Ledger Engine
+> **High-Throughput Digital Banking Ledger Engine** built with **Spec-Driven Development (SDD)**  
+> **Tech Stack:** Java 21 • Spring Boot 3.3 • Apache Kafka • Redis 7 • Oracle DB 23c • Kubernetes (GKE) • Terraform
+
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-indibank.aldianapps.com-success?style=for-the-badge&logo=google-chrome)](https://indibank.aldianapps.com)
+[![Swagger UI](https://img.shields.io/badge/API%20Docs-Swagger%20UI-orange?style=for-the-badge&logo=swagger)](https://indibank.aldianapps.com/swagger-ui.html)
+[![Java 21](https://img.shields.io/badge/Java-21%20LTS-red?style=for-the-badge&logo=openjdk)](https://openjdk.org/projects/jdk/21/)
+[![Kubernetes GKE](https://img.shields.io/badge/Kubernetes-GKE%20Jakarta-blue?style=for-the-badge&logo=kubernetes)](https://cloud.google.com/kubernetes-engine)
+
+---
+
+## 1. Executive Summary & Live Demo
+
+**IndiBank Core Engine** is a production-grade, event-driven banking transaction and ledger processing system designed for financial institutions requiring strict zero-loss consistency, sub-second latency, and regulatory auditability (e.g. **BI-FAST**, **Instant Interbank Transfer**, and **Core Banking Ledger**).
+
+### 🌐 Live Public Endpoints
+* **Interactive Banking Dashboard:** [https://indibank.aldianapps.com](https://indibank.aldianapps.com)  
+  *(Allows interviewers to execute live transfers, test idempotency replays, view real-time balance updates, and observe the live Kafka stream ticker).*
+* **Interactive Swagger / OpenAPI UI:** [https://indibank.aldianapps.com/swagger-ui.html](https://indibank.aldianapps.com/swagger-ui.html)
+* **OpenAPI 3.1 Contract:** [`spec/openapi.yaml`](./spec/openapi.yaml)
+* **AsyncAPI 3.0 Contract:** [`spec/asyncapi.yaml`](./spec/asyncapi.yaml)
+* **Oracle 23c DDL Specification:** [`spec/database-schema.sql`](./spec/database-schema.sql)
+* **Redis Concurrency Specification:** [`spec/redis-spec.md`](./spec/redis-spec.md)
+
+---
+
+## 2. Technology Mapping & Architectural Roles
+
+| Component | Technology | Role in Banking System |
+| :--- | :--- | :--- |
+| **Enterprise Core** | **Java 21 (OpenJDK) & Spring Boot 3.3** | High-concurrency transaction processing with **Virtual Threads (Project Loom)**, Clean Architecture, Spring Data JPA, Spring Kafka, Spring Data Redis, and SpringDoc OpenAPI. |
+| **System of Record** | **Oracle Database 23c Free** | **Immutable Financial Ledger**: ACID compliance, strict **Double-Entry Bookkeeping** (every transaction creates equal DEBIT and CREDIT journal lines), non-negative constraints (`balance >= 0`), and optimistic locking (`@Version`). |
+| **Concurrency Guard** | **Redis 7 (In-Memory Data Store)** | **Distributed Performance & Safety**: Strict **Idempotency Key Engine** (`SETNX` + TTL) preventing duplicate transfers, **Distributed Locks** on sender accounts mitigating race conditions, and **Fast-Path Balance Caching**. |
+| **Event Streaming** | **Apache Kafka 3.7+ (KRaft Mode)** | **Asynchronous Decoupling**: Event-driven settlement notifications (`bank.transfers.settled`), real-time **AML Fraud Detection** (`bank.fraud.alerts` flagging transfers > Rp 100M), and Dead-Letter Queueing (`bank.transfers.dlq`). |
+| **Container Platform** | **Kubernetes (Google Kubernetes Engine - GKE)** | Container orchestration running in the `asia-southeast2` (Jakarta) region with dedicated PVC storage for Oracle DB and auto-healing pods. |
+| **Infrastructure as Code** | **Terraform (HashiCorp)** | Fully declarative provisioning of the GKE cluster, Artifact Registry, and regional static ingress IP address. |
+
+---
+
+## 3. High-Level Architecture Flow
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Client as Digital Channel / Mobile Banking
+    participant API as Spring Boot 3 (Java 21)
+    participant Redis as Redis 7 (Guard & Lock)
+    participant Oracle as Oracle DB 23c (ACID Ledger)
+    participant Kafka as Apache Kafka (KRaft Stream)
+    participant AML as AML Compliance & Notification Worker
+
+    Client->>API: POST /api/v1/transfers (with Idempotency-Key)
+    API->>Redis: Check & Acquire Idempotency Key (SETNX)
+    alt Duplicate Request Detected
+        Redis-->>API: Key exists (COMPLETED state)
+        API-->>Client: 200 OK (Return cached transaction, NO double deduction)
+    end
+
+    API->>Redis: Acquire Distributed Lock on Sender Account (10s TTL)
+    API->>Oracle: Fetch Account balances & validate status (ACTIVE)
+    alt Balance Insufficient
+        API->>Redis: Release lock & delete in-progress key
+        API-->>Client: 422 Unprocessable Entity (INSUFFICIENT_FUNDS)
+    end
+
+    critical ACID Ledger Transaction
+        API->>Oracle: Debit Source Account Balance (Optimistic Lock @Version)
+        API->>Oracle: Credit Destination Account Balance
+        API->>Oracle: Insert TRANSFER record (SETTLED)
+        API->>Oracle: Insert DEBIT Journal Line (Source Account)
+        API->>Oracle: Insert CREDIT Journal Line (Destination Account)
+    end
+
+    API->>Redis: Evict/Update Balance Cache for both accounts
+    API->>Kafka: Publish Event to topic: bank.transfers.settled
+    API->>Redis: Mark Idempotency Key as COMPLETED (24h TTL)
+    API->>Redis: Release Distributed Lock
+    API-->>Client: 201 Created (Transfer Reference: TRX-YYYYMMDD-XXXX)
+
+    par Async Stream Processing
+        Kafka->>AML: Consume bank.transfers.settled
+        alt Transfer Amount >= Rp 100,000,000
+            AML->>Kafka: Publish CRITICAL Alert to bank.fraud.alerts
+        end
+        AML->>Client: Dispatch simulated SMS / Push Notification
+    end
+```
+
+---
+
+## 4. Key Banking Features
+
+### A. Strict Double-Entry Bookkeeping (Oracle DB)
+Financial transactions are never updated in-place; they are recorded as immutable journal entries:
+* **DEBIT Entry:** Created for the originating account, capturing the outgoing amount and balance after transaction.
+* **CREDIT Entry:** Created for the beneficiary account, capturing the incoming amount and balance after transaction.
+* The balance equation `Sum(Debits) == Sum(Credits)` is mathematically guaranteed.
+
+### B. Banking Idempotency State Machine (Redis)
+In digital banking, network dropouts often trigger client retries. IndiBank uses a 3-phase Redis state machine:
+1. `ACQUIRE (IN_PROGRESS)`: Key is reserved with a 60-second in-progress lock.
+2. `COMPLETED`: On ledger commit, the response payload is cached under the key for 24 hours. Replays immediately receive the original response without hitting the database or debiting funds.
+3. `ROLLBACK`: If validation fails before deduction, the key is released immediately.
+
+### C. Real-Time AML Fraud Detection (Kafka)
+* Whenever a transfer is settled, a `TransferSettledEvent` is published to Kafka.
+* The **AML Compliance Consumer** monitors transactions in real time. Any single transfer exceeding the regulatory threshold (**IDR 100,000,000.00**) triggers an immediate `FraudAlertEvent` to the `bank.fraud.alerts` topic with severity `CRITICAL`.
+
+---
+
+## 5. Automated Verification Test Suite
+
+A complete verification script is included to test all scenarios against the live environment:
+
+```bash
+# Run against the live production GKE cluster:
+./test-scenarios.sh https://indibank.aldianapps.com
+```
+
+The script executes 7 automated scenarios:
+1. **Query Demo Accounts:** Verifies accounts seeded in Oracle DB.
+2. **Execute Transfer:** Initiates a transfer from Budi Santoso to Siti Rahma.
+3. **Idempotency Replay:** Immediately resends the exact same transfer with the same UUID and asserts that the response is identical with no double charge.
+4. **Trigger AML Fraud Rule:** Executes a high-value transfer (> IDR 100M) and verifies fraud alert dispatch.
+5. **Real-Time Kafka Ticker:** Queries `/api/v1/events/recent` to inspect Kafka topics (`bank.transfers.settled` and `bank.fraud.alerts`).
+6. **Double-Entry Ledger Audit:** Queries the account statement to verify immutable debit/credit journal entries.
+7. **Insufficient Balance Protection:** Tests transfer exceeding balance and validates RFC 7807 error format.
+
+---
+
+## 6. Project Structure
+
+```
+indibank-core/
+├── spec/                          # Spec-Driven Development (SDD) Contracts
+│   ├── openapi.yaml               # REST API Specification (OpenAPI 3.1)
+│   ├── asyncapi.yaml              # Kafka Streaming Specification (AsyncAPI 3.0)
+│   ├── database-schema.sql        # Oracle DB 23c Schema DDL & Constraints
+│   └── redis-spec.md              # Redis Cache & Locking Specification
+├── terraform/                     # Infrastructure as Code (IaC)
+│   ├── main.tf                    # GKE Cluster, Artifact Registry, Static IP
+│   ├── variables.tf               # GCP Region (asia-southeast2 Jakarta), Zone
+│   └── versions.tf                # Google Provider requirements
+├── k8s/                           # Production Kubernetes Manifests
+│   ├── namespace.yaml             # 'indibank' namespace
+│   ├── oracle.yaml                # Oracle 23c Free Deployment, PVC, Service
+│   ├── redis.yaml                 # Redis 7 Deployment & Service
+│   ├── kafka.yaml                 # Apache Kafka KRaft Deployment & Service
+│   └── app.yaml                   # Spring Boot Deployment & Caddy TLS Gateway
+├── src/                           # Java 21 Spring Boot Application
+│   ├── main/java/com/indibank/core/
+│   │   ├── config/                # Kafka, Redis, OpenAPI, DataInitializer
+│   │   ├── domain/                # Entities, Enums, Spring Data Repositories
+│   │   ├── service/               # TransferService, DistributedLock, Idempotency
+│   │   ├── event/                 # Kafka Producers & AML Fraud Consumers
+│   │   ├── dto/                   # Request/Response Data Transfer Objects
+│   │   └── controller/            # REST Controllers & Exception Handlers
+│   └── main/resources/
+│       ├── application.yml        # Configuration for Oracle, Kafka, Redis
+│       └── static/index.html      # Interactive Banking Dashboard UI
+├── test-scenarios.sh              # Colored automated test verification script
+├── Dockerfile                     # Production multi-stage Docker build
+└── pom.xml                        # Maven configuration with Java 21
+```
+
+---
+
+## 7. Running Locally (Alternative via Docker Compose)
+
+If you wish to run the entire stack locally without Kubernetes:
+
+```bash
+# 1. Start Oracle 23c, Kafka, Redis, and Spring Boot
+docker compose up -d
+
+# 2. Open the Banking Dashboard in your browser:
+http://localhost:8080
+
+# 3. Open Swagger UI:
+http://localhost:8080/swagger-ui.html
+
+# 4. Run automated test scenarios:
+./test-scenarios.sh http://localhost:8080
+```
+
+---
+
+## 8. Author
+* **Aldian Fazrihady**  
+* Email: [aldian.f@gmail.com](mailto:aldian.f@gmail.com)  
+* Project: [https://indibank.aldianapps.com](https://indibank.aldianapps.com)

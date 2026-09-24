@@ -1,0 +1,149 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: indibank-core
+  namespace: indibank
+  labels:
+    app: indibank-core
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: indibank-core
+  template:
+    metadata:
+      labels:
+        app: indibank-core
+    spec:
+      containers:
+        - name: app
+          image: asia-southeast2-docker.pkg.dev/aldianfazrihady/indibank-repo/indibank-engine:v1
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:oracle:thin:@//oracle-db:1521/FREEPDB1"
+            - name: SPRING_DATASOURCE_USERNAME
+              value: "system"
+            - name: SPRING_DATASOURCE_PASSWORD
+              value: "IndiBank2026!"
+            - name: SPRING_DATA_REDIS_HOST
+              value: "redis"
+            - name: SPRING_DATA_REDIS_PORT
+              value: "6379"
+            - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+              value: "kafka:9092"
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1024Mi"
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 25
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 40
+            periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: indibank-core
+  namespace: indibank
+  labels:
+    app: indibank-core
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: 8080
+      name: http
+  selector:
+    app: indibank-core
+---
+# Reverse Proxy with Automatic Let's Encrypt SSL/TLS for indibank.aldianapps.com
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: caddy-config
+  namespace: indibank
+data:
+  Caddyfile: |
+    indibank.aldianapps.com {
+        reverse_proxy indibank-core:8080
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: indibank-gateway
+  namespace: indibank
+  labels:
+    app: indibank-gateway
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: indibank-gateway
+  template:
+    metadata:
+      labels:
+        app: indibank-gateway
+    spec:
+      containers:
+        - name: caddy
+          image: caddy:2-alpine
+          ports:
+            - containerPort: 80
+              name: http
+            - containerPort: 443
+              name: https
+          volumeMounts:
+            - name: config
+              mountPath: /etc/caddy/Caddyfile
+              subPath: Caddyfile
+            - name: caddy-data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+      volumes:
+        - name: config
+          configMap:
+            name: caddy-config
+        - name: caddy-data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: indibank-lb
+  namespace: indibank
+  labels:
+    app: indibank-gateway
+spec:
+  type: LoadBalancer
+  loadBalancerIP: "34.128.89.142"
+  ports:
+    - port: 80
+      targetPort: 80
+      name: http
+    - port: 443
+      targetPort: 443
+      name: https
+  selector:
+    app: indibank-gateway
