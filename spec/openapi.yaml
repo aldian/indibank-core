@@ -11,7 +11,9 @@ info:
 
 servers:
   - url: https://indibank.aldianapps.com
-    description: Production GKE Environment
+    description: Production GKE Blue-Green Environment
+  - url: https://test.indibank.aldianapps.com
+    description: Ephemeral Feature Preview Environment
   - url: http://localhost:8080
     description: Local Development Environment
 
@@ -227,6 +229,44 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/StreamEvent'
+
+  /actuator/health:
+    get:
+      tags:
+        - System
+      summary: Health & Liveness / Readiness Probes
+      description: Returns health status of application, database connectivity, Kafka broker, and Redis cluster.
+      operationId: getHealthStatus
+      responses:
+        '200':
+          description: System components healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: UP
+                  components:
+                    type: object
+
+  /actuator/prometheus:
+    get:
+      tags:
+        - System
+      summary: Prometheus Operational Telemetry Scrape Endpoint
+      description: |
+        Exposes Prometheus metrics including Four Golden Signals, HikariCP database pool saturation,
+        Kafka consumer lag, and JVM ZGC heap memory.
+      operationId: getPrometheusMetrics
+      responses:
+        '200':
+          description: Standard Prometheus text format telemetry
+          content:
+            text/plain:
+              schema:
+                type: string
 
 components:
   schemas:
