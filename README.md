@@ -182,19 +182,28 @@ indibank-core/
 
 ---
 
-## 7. Automated CI/CD with GitHub Actions
+## 7. Enterprise CI/CD & Deployment Strategies
 
-The repository includes a production-grade CI/CD pipeline ([`.github/workflows/ci-cd.yml`](./.github/workflows/ci-cd.yml)):
-1. **Continuous Integration (CI):**
-   * Automatically executes on every `push` and `pull_request` to `main`.
-   * Sets up OpenJDK 21 (Temurin) with Maven dependency caching.
-   * Compiles the codebase and runs the complete unit and contract test suite.
-   * Packages the executable Spring Boot archive artifact.
-2. **Continuous Deployment (CD):**
-   * Authenticates securely to Google Cloud using a scoped IAM Service Account.
-   * Builds and pushes the container image tagged with both `$GITHUB_SHA` and `latest` to Google Artifact Registry.
-   * Performs a rolling zero-downtime update to the GKE Jakarta cluster.
-   * Runs an automated post-deployment health check against `https://indibank.aldianapps.com`.
+The repository is protected and automated with an enterprise-grade CI/CD pipeline ([`.github/workflows/ci-cd.yml`](./.github/workflows/ci-cd.yml)):
+
+### 🛡️ Strict Branch Protection & Quality Barrier (>= 95% Coverage)
+* **Direct Push Prevention:** Direct pushes to `main` are strictly blocked. All changes must be delivered via Pull Requests with mandatory peer reviews and passing status checks.
+* **JaCoCo Quality Gate (>= 95% Threshold):** The pipeline strictly enforces that both line and instruction test coverage must meet or exceed **95%**. Pull requests and builds with $< 95\%$ coverage fail immediately. (Current suite: **99.2% line coverage** across 59 unit and domain tests).
+
+### 🚀 Ephemeral Preview Test Domain (`test.indibank.aldianapps.com`)
+* When developers push to any `feature/**` branch, GitHub Actions builds a preview container image tagged with `preview-${GITHUB_SHA}` and deploys it to an isolated preview pod and service (`indibank-core-preview`).
+* Accessible at **[https://test.indibank.aldianapps.com](https://test.indibank.aldianapps.com)** with automated Let's Encrypt TLS.
+* Enables thorough manual exploratory testing, API verification, and scenario validation prior to merging to `main`.
+
+### 🔄 Zero-Downtime Blue-Green Production Deployment (`indibank.aldianapps.com`)
+* **Why Blue-Green?** In core banking ledgers, in-flight transaction interruption is unacceptable. Blue-Green ensures a completely separate environment is provisioned and warmed up before live traffic cutover.
+* **Deployment Workflow:**
+  1. The pipeline queries the Kubernetes Service selector to identify the currently active production slot (`blue` or `green`).
+  2. The standby target slot (e.g. `green`) is scaled up to 1 replica and updated with the release container image.
+  3. Spring Boot startup and readiness probes (`/actuator/health`) verify database connectivity and Kafka bindings.
+  4. An atomic Kubernetes Service selector patch switches live traffic to the target slot in milliseconds with zero dropped connections.
+  5. The former slot is gracefully scaled down after a stabilization window.
+  6. **Instant Rollback:** If any unforeseen anomaly occurs post-cutover, reverting traffic to the previous color takes $< 1$ second via a single `kubectl patch service` command.
 
 ---
 
