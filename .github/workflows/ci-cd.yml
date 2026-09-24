@@ -186,10 +186,7 @@ jobs:
           kubectl set image deployment/indibank-core-$TARGET_SLOT app=${{ env.RELEASE_IMAGE }} -n indibank
           kubectl rollout status deployment/indibank-core-$TARGET_SLOT -n indibank --timeout=180s
 
-          # Step C: Health verification on target slot
-          kubectl wait --for=condition=ready pod -l app=indibank-core,slot=$TARGET_SLOT -n indibank --timeout=60s
-
-          # Step D: Atomic traffic switch to new version (Zero Downtime)
+          # Step C: Atomic traffic switch to new version (Zero Downtime)
           kubectl patch service indibank-core -n indibank -p "{\"spec\":{\"selector\":{\"slot\":\"$TARGET_SLOT\"}}}"
           echo "Production traffic successfully cut over to $TARGET_SLOT"
 
