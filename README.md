@@ -25,6 +25,8 @@
 * **AsyncAPI 3.0 Contract:** [`spec/asyncapi.yaml`](./spec/asyncapi.yaml)
 * **Oracle 23c DDL Specification:** [`spec/database-schema.sql`](./spec/database-schema.sql)
 * **Redis Concurrency Specification:** [`spec/redis-spec.md`](./spec/redis-spec.md)
+* **Production SRE Framework & Runbooks:** [`docs/sre/SRE_FRAMEWORK.md`](./docs/sre/SRE_FRAMEWORK.md)
+* **Prometheus Alerting Rules:** [`monitoring/prometheus-alerts.yaml`](./monitoring/prometheus-alerts.yaml)
 
 ---
 
