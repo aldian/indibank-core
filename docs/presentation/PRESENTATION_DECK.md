@@ -5,22 +5,23 @@
 
 ---
 
-## 1. Quick Presentation Assets
+## 1. Quick Presentation Assets (Bilingual: EN & ID)
 
-| Asset | Format | Location | Purpose |
-| :--- | :--- | :--- | :--- |
-| **PowerPoint / Google Slides** | `.pptx` (16:9 Widescreen) | [`docs/presentation/IndiBank_Core_Architecture_Presentation.pptx`](./IndiBank_Core_Architecture_Presentation.pptx) | Native 16:9 slide deck with embedded speaker notes on every slide. Ready to upload to Google Slides. |
-| **Interactive Web Slides** | `.html` (Standalone) | [`docs/presentation/slides.html`](./slides.html) | Browser-based interactive presentation with arrow navigation and toggleable speaker notes panel (`S` key). |
-| **Slide Generator Script** | Python (`python-pptx`) | [`docs/presentation/build_deck.py`](./build_deck.py) | Automated generator for updating typography, theme, and speaker notes. |
+| Asset | Language | Format | Location | Purpose |
+| :--- | :--- | :--- | :--- | :--- |
+| **PowerPoint / Google Slides (EN)** | English | `.pptx` (16:9 Widescreen) | [`docs/presentation/IndiBank_Core_Architecture_Presentation_EN.pptx`](./IndiBank_Core_Architecture_Presentation_EN.pptx) | English slide deck with embedded speaker notes on every slide. Ready to upload to Google Slides. |
+| **PowerPoint / Google Slides (ID)** | Bahasa Indonesia | `.pptx` (16:9 Widescreen) | [`docs/presentation/IndiBank_Core_Architecture_Presentation_ID.pptx`](./IndiBank_Core_Architecture_Presentation_ID.pptx) | Indonesian slide deck with embedded speaker notes on every slide. Ready to upload to Google Slides. |
+| **Interactive Web Slides** | Bilingual (Toggle) | `.html` (Standalone) | [`docs/presentation/slides.html`](./slides.html) | Browser-based interactive presentation with instant `[EN \| ID]` toggle, keyboard navigation, and speaker notes panel (`S` key). |
+| **Indonesian Guide & Script** | Bahasa Indonesia | Markdown | [`docs/presentation/PRESENTATION_DECK_ID.md`](./PRESENTATION_DECK_ID.md) | Dedicated Indonesian presentation guide, talking script, and Q&A prep. |
+| **Slide Generator Script** | Python (`python-pptx`) | Python | [`docs/presentation/build_deck.py`](./build_deck.py) | Automated generator that builds both English and Indonesian decks simultaneously. |
 
 ### 🚀 How to Open in Google Slides
 1. Open your browser and navigate to **[Google Slides](https://slides.google.com)**.
 2. Click **Blank presentation** (or click the folder icon **"Open file picker"**).
 3. Select the **Upload** tab.
-4. Drag and drop or browse to:
-   ```text
-   /mnt/projects/indivara/docs/presentation/IndiBank_Core_Architecture_Presentation.pptx
-   ```
+4. Drag and drop or browse to either:
+   - **English Version:** `/mnt/projects/indivara/docs/presentation/IndiBank_Core_Architecture_Presentation_EN.pptx`
+   - **Indonesian Version:** `/mnt/projects/indivara/docs/presentation/IndiBank_Core_Architecture_Presentation_ID.pptx`
 5. Google Slides automatically converts the presentation into native Google Slides format with all layouts, color palettes, and **presenter notes** preserved!
 
 ---

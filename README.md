@@ -27,6 +27,9 @@
 * **Redis Concurrency Specification:** [`spec/redis-spec.md`](./spec/redis-spec.md)
 * **Production SRE Framework & Runbooks:** [`docs/sre/SRE_FRAMEWORK.md`](./docs/sre/SRE_FRAMEWORK.md)
 * **Prometheus Alerting Rules:** [`monitoring/prometheus-alerts.yaml`](./monitoring/prometheus-alerts.yaml)
+* **Technical Architecture Presentation (English):** [`docs/presentation/IndiBank_Core_Architecture_Presentation_EN.pptx`](./docs/presentation/IndiBank_Core_Architecture_Presentation_EN.pptx)
+* **Technical Architecture Presentation (Bahasa Indonesia):** [`docs/presentation/IndiBank_Core_Architecture_Presentation_ID.pptx`](./docs/presentation/IndiBank_Core_Architecture_Presentation_ID.pptx)
+* **Interactive Web Slides (Bilingual EN/ID):** [`docs/presentation/slides.html`](./docs/presentation/slides.html)
 
 ---
 
