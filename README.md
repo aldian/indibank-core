@@ -188,7 +188,22 @@ The repository is protected and automated with an enterprise-grade CI/CD pipelin
 
 ### 🛡️ Strict Branch Protection & Quality Barrier (>= 95% Coverage)
 * **Direct Push Prevention:** Direct pushes to `main` are strictly blocked. All changes must be delivered via Pull Requests with mandatory peer reviews and passing status checks.
-* **JaCoCo Quality Gate (>= 95% Threshold):** The pipeline strictly enforces that both line and instruction test coverage must meet or exceed **95%**. Pull requests and builds with $< 95\%$ coverage fail immediately. (Current suite: **99.2% line coverage** across 59 unit and domain tests).
+* **JaCoCo Quality Gate (>= 95% Threshold):** The pipeline strictly enforces that both line and instruction test coverage must meet or exceed **95%**. Pull requests and builds with $< 95\%$ coverage fail immediately. (Current suite: **99.27% line coverage** across 70 unit and integration tests).
+
+### 🧪 3-Tier Enterprise Testing Pyramid
+IndiBank Core implements a comprehensive testing pyramid across three distinct layers:
+1. **Unit Tests (59 tests):**
+   * **Domain & Ledger Engine:** Verifies account balance mutation, non-negative balance constraints, and optimistic locking (`AccountModelTest`).
+   * **Core Transfer Service:** Exhaustive edge cases including insufficient balance, frozen/dormant account status, identical source/destination accounts, and Kafka publish fallbacks (`TransferServiceTest`).
+   * **Idempotency & Distributed Locking:** Unit tests for Redis `SETNX` TTL locks, concurrent replay detection, and Lua script distributed locking (`IdempotencyServiceTest`, `DistributedLockServiceTest`).
+   * **AML Fraud Rules & Streaming:** Verifies event serialization, threshold screening (> Rp 100M), and in-memory rolling event tracking (`EventComponentsTest`).
+2. **Integration Tests (`@WebMvcTest` + MockMvc):**
+   * **HTTP Routing & Contract Validation:** Verifies Spring Web MVC dispatching, JSON serialization, and required HTTP headers (`Idempotency-Key`, `X-Correlation-ID`) (`TransferControllerIntegrationTest`, `AccountControllerIntegrationTest`).
+   * **Bean Validation (@Valid):** Verifies that malformed inputs, missing fields, or amounts exceeding `@DecimalMax` are rejected at the edge with HTTP 400 Bad Request before hitting the service layer.
+   * **Global Exception Handling:** Verifies RFC 7807 consistent error payload formatting (`ApiErrorDto`) across 400, 404, 409, 422, and 500 status codes.
+3. **End-to-End (E2E) Live System Tests (`test-scenarios.sh`):**
+   * Automated shell suite executing 7 real HTTP/TLS banking scenarios against live environments (`https://indibank.aldianapps.com`, `https://test.indibank.aldianapps.com`, or local Docker Compose).
+   * Verifies end-to-end connectivity across Spring Boot ➔ Oracle 23c Free ➔ Redis 7 ➔ Apache Kafka KRaft ➔ Caddy TLS reverse proxy.
 
 ### 🚀 Ephemeral Preview Test Domain (`test.indibank.aldianapps.com`)
 * When developers push to any `feature/**` branch, GitHub Actions builds a preview container image tagged with `preview-${GITHUB_SHA}` and deploys it to an isolated preview pod and service (`indibank-core-preview`).
