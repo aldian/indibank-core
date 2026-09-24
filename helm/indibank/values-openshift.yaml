@@ -1,0 +1,24 @@
+# Overrides for deployment to Red Hat OpenShift Container Platform (OCP)
+targetPlatform: "openshift"
+
+app:
+  image:
+    repository: image-registry.openshift-image-registry.svc:5000/indibank/indibank-engine
+    tag: "latest"
+
+oracle:
+  persistence:
+    enabled: true
+    storageClass: "ocs-storagecluster-ceph-rbd" # OpenShift Data Foundation / Ceph RBD
+    size: 20Gi
+
+ingress:
+  enabled: false
+
+openshift:
+  route:
+    enabled: true
+    host: "indibank.apps.ocp-cluster.bank.local"
+    tls:
+      termination: edge
+      insecureEdgeTerminationPolicy: Redirect

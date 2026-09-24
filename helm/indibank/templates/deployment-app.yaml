@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-core
+  labels:
+    app.kubernetes.io/name: indibank-core
+spec:
+  replicas: {{ .Values.app.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: indibank-core
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: indibank-core
+    spec:
+      containers:
+        - name: app
+          image: "{{ .Values.app.image.repository }}:{{ .Values.app.image.tag }}"
+          imagePullPolicy: {{ .Values.app.image.pullPolicy }}
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:oracle:thin:@//{{ .Release.Name }}-oracle:1521/FREEPDB1"
+            - name: SPRING_DATASOURCE_USERNAME
+              value: "system"
+            - name: SPRING_DATASOURCE_PASSWORD
+              value: "{{ .Values.oracle.password }}"
+            - name: SPRING_DATA_REDIS_HOST
+              value: "{{ .Release.Name }}-redis"
+            - name: SPRING_DATA_REDIS_PORT
+              value: "6379"
+            - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+              value: "{{ .Release.Name }}-kafka:9092"
+          resources:
+            {{- toYaml .Values.app.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 25
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 40
+            periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-core
+  labels:
+    app.kubernetes.io/name: indibank-core
+spec:
+  type: {{ .Values.app.service.type }}
+  ports:
+    - port: {{ .Values.app.service.port }}
+      targetPort: 8080
+      name: http
+      {{- if and (eq .Values.app.service.type "NodePort") .Values.app.service.nodePort }}
+      nodePort: {{ .Values.app.service.nodePort }}
+      {{- end }}
+  selector:
+    app.kubernetes.io/name: indibank-core

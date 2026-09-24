@@ -1,0 +1,102 @@
+name: IndiBank CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  REGISTRY_HOST: asia-southeast2-docker.pkg.dev
+  IMAGE_NAME: asia-southeast2-docker.pkg.dev/aldianfazrihady/indibank-repo/indibank-engine
+
+jobs:
+  test:
+    name: Build & Unit Tests (Java 21)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up OpenJDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'maven'
+
+      - name: Run Unit & Spec Tests
+        run: mvn clean test
+
+      - name: Package Spring Boot Executable JAR
+        run: mvn package -DskipTests
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: indibank-jar
+          path: target/indibank-core-*.jar
+          retention-days: 1
+
+  deploy:
+    name: Deploy to Google Kubernetes Engine (GKE Jakarta)
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Download Build Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: indibank-jar
+          path: target/
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          install_components: 'gke-gcloud-auth-plugin'
+
+      - name: Configure Docker Authentication
+        run: gcloud auth configure-docker ${{ env.REGISTRY_HOST }} --quiet
+
+      - name: Build & Tag Container Image
+        run: |
+          IMAGE_TAG="${{ env.IMAGE_NAME }}:${{ github.sha }}"
+          IMAGE_LATEST="${{ env.IMAGE_NAME }}:latest"
+          
+          docker build -t "$IMAGE_TAG" -t "$IMAGE_LATEST" .
+          docker push "$IMAGE_TAG"
+          docker push "$IMAGE_LATEST"
+          echo "DEPLOY_IMAGE=$IMAGE_TAG" >> $GITHUB_ENV
+
+      - name: Connect to GKE Cluster
+        run: |
+          gcloud container clusters get-credentials ${{ secrets.GKE_CLUSTER }} \
+            --zone ${{ secrets.GKE_ZONE }} \
+            --project ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Apply Kubernetes Manifests & Rolling Update
+        run: |
+          kubectl apply -f k8s/namespace.yaml
+          kubectl apply -f k8s/oracle.yaml
+          kubectl apply -f k8s/redis.yaml
+          kubectl apply -f k8s/kafka.yaml
+          kubectl apply -f k8s/app.yaml
+          
+          # Update application deployment to new image version
+          kubectl set image deployment/indibank-core app=${{ env.DEPLOY_IMAGE }} -n indibank
+          kubectl rollout status deployment/indibank-core -n indibank --timeout=180s
+
+      - name: Run Smoke Test against Live Production
+        run: |
+          echo "Verifying live endpoint https://indibank.aldianapps.com/api/v1/accounts..."
+          curl -f -s https://indibank.aldianapps.com/api/v1/accounts | jq .

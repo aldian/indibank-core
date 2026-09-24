@@ -1,0 +1,29 @@
+# Overrides for deployment to AWS EKS
+targetPlatform: "aws"
+
+app:
+  image:
+    repository: 818954087576.dkr.ecr.ap-southeast-3.amazonaws.com/indibank-engine
+    tag: "latest"
+  service:
+    type: NodePort
+
+oracle:
+  persistence:
+    enabled: true
+    storageClass: "gp3" # AWS EBS CSI driver storage class
+    size: 20Gi
+
+ingress:
+  enabled: true
+  className: "alb"
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+  hosts:
+    - host: indibank.aldianapps.com
+      paths:
+        - path: /
+          pathType: Prefix

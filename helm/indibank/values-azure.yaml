@@ -1,0 +1,24 @@
+# Overrides for deployment to Azure AKS
+targetPlatform: "azure"
+
+app:
+  image:
+    repository: indibankacr.azurecr.io/indibank-engine
+    tag: "latest"
+
+oracle:
+  persistence:
+    enabled: true
+    storageClass: "managed-csi" # Azure Disk CSI driver
+    size: 20Gi
+
+ingress:
+  enabled: true
+  className: "azure/application-gateway"
+  annotations:
+    appgw.ingress.kubernetes.io/ssl-redirect: "true"
+  hosts:
+    - host: indibank.aldianapps.com
+      paths:
+        - path: /
+          pathType: Prefix

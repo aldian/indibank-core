@@ -4,8 +4,9 @@
 
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-indibank.aldianapps.com-success?style=for-the-badge&logo=google-chrome)](https://indibank.aldianapps.com)
 [![Swagger UI](https://img.shields.io/badge/API%20Docs-Swagger%20UI-orange?style=for-the-badge&logo=swagger)](https://indibank.aldianapps.com/swagger-ui.html)
+[![CI/CD Pipeline](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-2088FF?style=for-the-badge&logo=githubactions)](https://github.com/aldian/indibank-core/actions)
+[![Multi-Platform](https://img.shields.io/badge/Deploy-GCP%20%7C%20AWS%20%7C%20Azure%20%7C%20OpenShift%20%7C%20Local-9cf?style=for-the-badge&logo=helm)](./docs/deployment/MULTI_PLATFORM.md)
 [![Java 21](https://img.shields.io/badge/Java-21%20LTS-red?style=for-the-badge&logo=openjdk)](https://openjdk.org/projects/jdk/21/)
-[![Kubernetes GKE](https://img.shields.io/badge/Kubernetes-GKE%20Jakarta-blue?style=for-the-badge&logo=kubernetes)](https://cloud.google.com/kubernetes-engine)
 
 ---
 
@@ -13,10 +14,13 @@
 
 **IndiBank Core Engine** is a production-grade, event-driven banking transaction and ledger processing system designed for financial institutions requiring strict zero-loss consistency, sub-second latency, and regulatory auditability (e.g. **BI-FAST**, **Instant Interbank Transfer**, and **Core Banking Ledger**).
 
-### 🌐 Live Public Endpoints
+### 🌐 Live Public Endpoints & Contracts
 * **Interactive Banking Dashboard:** [https://indibank.aldianapps.com](https://indibank.aldianapps.com)  
   *(Allows interviewers to execute live transfers, test idempotency replays, view real-time balance updates, and observe the live Kafka stream ticker).*
 * **Interactive Swagger / OpenAPI UI:** [https://indibank.aldianapps.com/swagger-ui.html](https://indibank.aldianapps.com/swagger-ui.html)
+* **Automated CI/CD Pipeline:** [`.github/workflows/ci-cd.yml`](./.github/workflows/ci-cd.yml)
+* **Multi-Platform Deployment Guide:** [`docs/deployment/MULTI_PLATFORM.md`](./docs/deployment/MULTI_PLATFORM.md)
+* **Production Helm Chart:** [`helm/indibank/`](./helm/indibank/)
 * **OpenAPI 3.1 Contract:** [`spec/openapi.yaml`](./spec/openapi.yaml)
 * **AsyncAPI 3.0 Contract:** [`spec/asyncapi.yaml`](./spec/asyncapi.yaml)
 * **Oracle 23c DDL Specification:** [`spec/database-schema.sql`](./spec/database-schema.sql)
@@ -137,16 +141,29 @@ indibank-core/
 │   ├── asyncapi.yaml              # Kafka Streaming Specification (AsyncAPI 3.0)
 │   ├── database-schema.sql        # Oracle DB 23c Schema DDL & Constraints
 │   └── redis-spec.md              # Redis Cache & Locking Specification
-├── terraform/                     # Infrastructure as Code (IaC)
-│   ├── main.tf                    # GKE Cluster, Artifact Registry, Static IP
-│   ├── variables.tf               # GCP Region (asia-southeast2 Jakarta), Zone
-│   └── versions.tf                # Google Provider requirements
-├── k8s/                           # Production Kubernetes Manifests
+├── helm/indibank/                 # Unified Multi-Platform Helm Chart
+│   ├── Chart.yaml                 # Helm metadata
+│   ├── values.yaml                # Default Kubernetes values
+│   ├── values-local.yaml          # Minikube / Kind local development values
+│   ├── values-aws.yaml            # AWS EKS (ALB Ingress) values
+│   ├── values-azure.yaml          # Azure AKS (AGIC Ingress) values
+│   ├── values-openshift.yaml      # Red Hat OpenShift (Route & SCC) values
+│   └── templates/                 # Deployments, Services, PVCs, Ingress, OpenShift Route
+├── terraform/                     # Multi-Cloud Infrastructure as Code (IaC)
+│   ├── main.tf                    # GCP GKE Cluster (Jakarta), Artifact Registry, Static IP
+│   ├── variables.tf               # GCP Region & cluster settings
+│   ├── aws/main.tf                # AWS EKS Cluster (Jakarta ap-southeast-3), VPC, ECR
+│   └── azure/main.tf              # Azure AKS Cluster (Indonesia Central), VNet, ACR
+├── k8s/                           # Production Kubernetes Manifests (GKE)
 │   ├── namespace.yaml             # 'indibank' namespace
 │   ├── oracle.yaml                # Oracle 23c Free Deployment, PVC, Service
 │   ├── redis.yaml                 # Redis 7 Deployment & Service
 │   ├── kafka.yaml                 # Apache Kafka KRaft Deployment & Service
 │   └── app.yaml                   # Spring Boot Deployment & Caddy TLS Gateway
+├── .github/workflows/
+│   └── ci-cd.yml                  # Automated GitHub Actions CI (Java 21) & CD (GKE)
+├── docs/deployment/
+│   └── MULTI_PLATFORM.md          # Multi-Platform (Minikube, OpenShift, AWS, Azure, GCP) Guide
 ├── src/                           # Java 21 Spring Boot Application
 │   ├── main/java/com/indibank/core/
 │   │   ├── config/                # Kafka, Redis, OpenAPI, DataInitializer
@@ -165,7 +182,23 @@ indibank-core/
 
 ---
 
-## 7. Running Locally (Alternative via Docker Compose)
+## 7. Automated CI/CD with GitHub Actions
+
+The repository includes a production-grade CI/CD pipeline ([`.github/workflows/ci-cd.yml`](./.github/workflows/ci-cd.yml)):
+1. **Continuous Integration (CI):**
+   * Automatically executes on every `push` and `pull_request` to `main`.
+   * Sets up OpenJDK 21 (Temurin) with Maven dependency caching.
+   * Compiles the codebase and runs the complete unit and contract test suite.
+   * Packages the executable Spring Boot archive artifact.
+2. **Continuous Deployment (CD):**
+   * Authenticates securely to Google Cloud using a scoped IAM Service Account.
+   * Builds and pushes the container image tagged with both `$GITHUB_SHA` and `latest` to Google Artifact Registry.
+   * Performs a rolling zero-downtime update to the GKE Jakarta cluster.
+   * Runs an automated post-deployment health check against `https://indibank.aldianapps.com`.
+
+---
+
+## 8. Running Locally (Alternative via Docker Compose)
 
 If you wish to run the entire stack locally without Kubernetes:
 
@@ -185,7 +218,7 @@ http://localhost:8080/swagger-ui.html
 
 ---
 
-## 8. Author
+## 9. Author
 * **Aldian Fazrihady**  
 * Email: [aldian.f@gmail.com](mailto:aldian.f@gmail.com)  
 * Project: [https://indibank.aldianapps.com](https://indibank.aldianapps.com)

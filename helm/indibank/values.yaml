@@ -1,0 +1,84 @@
+# Default values for IndiBank Core Engine Helm Chart
+targetPlatform: "kubernetes" # kubernetes, openshift, local
+
+app:
+  replicaCount: 1
+  image:
+    repository: asia-southeast2-docker.pkg.dev/aldianfazrihady/indibank-repo/indibank-engine
+    tag: "latest"
+    pullPolicy: Always
+  service:
+    type: ClusterIP
+    port: 8080
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1024Mi
+
+oracle:
+  enabled: true
+  image:
+    repository: gvenzl/oracle-free
+    tag: "slim"
+  password: "IndiBank2026!"
+  persistence:
+    enabled: true
+    size: 15Gi
+    storageClass: ""
+  resources:
+    requests:
+      cpu: 300m
+      memory: 1500Mi
+    limits:
+      cpu: 1500m
+      memory: 2500Mi
+
+redis:
+  enabled: true
+  image:
+    repository: redis
+    tag: "7-alpine"
+  service:
+    port: 6379
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 300m
+      memory: 256Mi
+
+kafka:
+  enabled: true
+  image:
+    repository: apache/kafka
+    tag: "3.7.0"
+  clusterId: "MkU3OEVBNTcwNTJENDM2Qk"
+  service:
+    port: 9092
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      cpu: 500m
+      memory: 1024Mi
+
+ingress:
+  enabled: true
+  className: "gce"
+  annotations: {}
+  hosts:
+    - host: indibank.aldianapps.com
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+
+openshift:
+  route:
+    enabled: false
+    tls:
+      termination: edge
