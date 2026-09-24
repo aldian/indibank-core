@@ -11,6 +11,7 @@
 | :--- | :--- | :--- | :--- | :--- |
 | **PowerPoint / Google Slides (EN)** | English | `.pptx` (16:9 Widescreen) | [`docs/presentation/IndiBank_Core_Architecture_Presentation_EN.pptx`](./IndiBank_Core_Architecture_Presentation_EN.pptx) | English slide deck with embedded speaker notes on every slide. Ready to upload to Google Slides. |
 | **PowerPoint / Google Slides (ID)** | Bahasa Indonesia | `.pptx` (16:9 Widescreen) | [`docs/presentation/IndiBank_Core_Architecture_Presentation_ID.pptx`](./IndiBank_Core_Architecture_Presentation_ID.pptx) | Indonesian slide deck with embedded speaker notes on every slide. Ready to upload to Google Slides. |
+| **Live Demo Execution Script** | Bilingual (EN & ID) | Markdown | [`docs/presentation/DEMO_SCRIPT.md`](./DEMO_SCRIPT.md) | Structured 6-minute live demo playbook with step-by-step screen actions, speaker scripts, and CLI fail-safe. |
 | **Interactive Web Slides** | Bilingual (Toggle) | `.html` (Standalone) | [`docs/presentation/slides.html`](./slides.html) | Browser-based interactive presentation with instant `[EN \| ID]` toggle, keyboard navigation, and speaker notes panel (`S` key). |
 | **Indonesian Guide & Script** | Bahasa Indonesia | Markdown | [`docs/presentation/PRESENTATION_DECK_ID.md`](./PRESENTATION_DECK_ID.md) | Dedicated Indonesian presentation guide, talking script, and Q&A prep. |
 | **Slide Generator Script** | Python (`python-pptx`) | Python | [`docs/presentation/build_deck.py`](./build_deck.py) | Automated generator that builds both English and Indonesian decks simultaneously. |
