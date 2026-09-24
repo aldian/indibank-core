@@ -1,0 +1,149 @@
+================================================================================
+INDIBANK CORE TRANSACTION & LEDGER ENGINE
+PANDUAN PEMBUKTIAN TEKNIS PENGGUNAAN ORACLE, REDIS, DAN KAFKA
+================================================================================
+Target Sistem : Google Kubernetes Engine (GKE) - Region Jakarta (asia-southeast2)
+Namespace     : indibank
+Domain Publik : https://indibank.aldianapps.com
+Dokumentasi   : https://indibank.aldianapps.com/swagger-ui.html
+Metrik SRE    : https://indibank.aldianapps.com/actuator/prometheus
+================================================================================
+
+
+BAGIAN 1: PEMBUKTIAN CEPAT VIA BROWSER / REST API (TANPA TERMINAL)
+--------------------------------------------------------------------------------
+Sangat cocok dilakukan saat mempresentasikan layar langsung ke audiens.
+
+1. Pembuktian Oracle Database & Redis Sekaligus:
+   Buka URL di browser:
+   https://indibank.aldianapps.com/actuator/health
+
+   Perhatikan blok JSON yang dikembalikan:
+   {
+     "status": "UP",
+     "components": {
+       "db": {
+         "status": "UP",
+         "details": {
+           "database": "Oracle",
+           "validationQuery": "isValid()"
+         }
+       },
+       "redis": {
+         "status": "UP",
+         "details": {
+           "version": "7.4.11"
+         }
+       }
+     }
+   }
+   -> Membuktikan database engine yang aktif adalah "Oracle" dan cache adalah "Redis v7.4.11".
+
+2. Pembuktian Apache Kafka:
+   A. Buka dashboard: https://indibank.aldianapps.com
+      - Terminal di sebelah kanan menampilkan status:
+        "[Kafka KRaft Stream Listening] - CONNECTED"
+      - Saat transaksi dijalankan, kartu event muncul dengan metadata internal Kafka:
+        "[P:0 Off:4] bank.transfers.settled" (Partition 0, Offset 4).
+   B. Buka endpoint event:
+      https://indibank.aldianapps.com/api/v1/events/recent
+      - Menampilkan riwayat event JSON yang diterima dari broker Kafka.
+
+
+================================================================================
+BAGIAN 2: PEMBUKTIAN MENDALAM VIA TERMINAL (KUBERNETES CLI)
+================================================================================
+Perintah-perintah 1-liner di bawah ini langsung mengeksekusi query dan tool ke
+dalam pod Kubernetes aktif di GKE cluster.
+
+
+--------------------------------------------------------------------------------
+A. PEMBUKTIAN ORACLE DATABASE 23c (ACID & Double-Entry Ledger)
+--------------------------------------------------------------------------------
+
+1. Periksa Status Pod Oracle di GKE:
+   kubectl get pods -n indibank -l app=oracle-db
+
+2. Tampilkan Saldo Seluruh Rekening Nasabah (Format Tabel Rapi):
+   kubectl exec -n indibank deploy/oracle-db -c oracle -- bash -c "echo -e 'ALTER SESSION SET CONTAINER = FREEPDB1;\nCOLUMN ACCOUNT_NUMBER FORMAT A12;\nCOLUMN ACCOUNT_HOLDER_NAME FORMAT A32;\nCOLUMN BALANCE FORMAT 999,999,999,999;\nSET PAGESIZE 50 LINESIZE 100;\nSELECT ACCOUNT_NUMBER, ACCOUNT_HOLDER_NAME, BALANCE FROM SYSTEM.ACCOUNTS;' | sqlplus -s / as sysdba"
+
+   Contoh Output:
+   ACCOUNT_NUMB ACCOUNT_HOLDER_NAME               BALANCE
+   ------------ -------------------------------- ----------------
+   1001002001   Budi Santoso (PT Solusi Digital)    1,062,499,000
+   1001002002   Siti Rahma (Retail Savings)           202,501,000
+   1001002003   Indivara Corporate Treasury           500,000,000
+   1001002004   Ahmad Hidayat (Payroll)                 3,200,000
+   1001002099   National Clearing Settlement GL     9,999,999,999
+
+3. Tampilkan Riwayat Transaksi Settlement Terakhir:
+   kubectl exec -n indibank deploy/oracle-db -c oracle -- bash -c "echo -e 'ALTER SESSION SET CONTAINER = FREEPDB1;\nCOLUMN TRANSFER_REFERENCE FORMAT A26;\nCOLUMN STATUS FORMAT A10;\nCOLUMN AMOUNT FORMAT 999,999,999;\nSET PAGESIZE 50 LINESIZE 100;\nSELECT TRANSFER_REFERENCE, AMOUNT, STATUS FROM SYSTEM.TRANSFERS ORDER BY ID DESC FETCH FIRST 5 ROWS ONLY;' | sqlplus -s / as sysdba"
+
+   Contoh Output:
+   TRANSFER_REFERENCE         AMOUNT STATUS
+   -------------------------- ------------ ----------
+   TRX-20260924-082445-4901    150,000,000 SETTLED
+   TRX-20260924-080305-7113     25,001,000 SETTLED
+   TRX-20260924-073056-8215    150,000,000 SETTLED
+
+4. Tampilkan Entri Pembukuan Ganda (Double-Entry General Ledger):
+   kubectl exec -n indibank deploy/oracle-db -c oracle -- bash -c "echo -e 'ALTER SESSION SET CONTAINER = FREEPDB1;\nCOLUMN ENTRY_TYPE FORMAT A10;\nCOLUMN AMOUNT FORMAT 999,999,999;\nCOLUMN BALANCE_AFTER FORMAT 999,999,999,999;\nSET PAGESIZE 50 LINESIZE 100;\nSELECT ENTRY_TYPE, AMOUNT, BALANCE_AFTER FROM SYSTEM.JOURNAL_ENTRIES ORDER BY ID DESC FETCH FIRST 6 ROWS ONLY;' | sqlplus -s / as sysdba"
+
+
+--------------------------------------------------------------------------------
+B. PEMBUKTIAN REDIS 7 (Idempotency State Machine & Event Sync)
+--------------------------------------------------------------------------------
+
+1. Tes Konektivitas Ping Redis CLI:
+   kubectl exec -n indibank deploy/redis -- redis-cli ping
+   Output: PONG
+
+2. Tampilkan Seluruh Key Idempotency & Cache:
+   kubectl exec -n indibank deploy/redis -- redis-cli keys "*"
+
+   Contoh Output:
+   indibank:idempotency:e6517487-1931-4e1a-ad04-16ccb88bf8fb
+   indibank:idempotency:a0000b42-d038-4a7b-a7e4-166e18600800
+   indibank:events:recent
+
+3. Intip Isi Struk Idempoten (Disimpan dalam Redis dengan TTL 24 Jam):
+   kubectl exec -n indibank deploy/redis -- redis-cli get "indibank:idempotency:e6517487-1931-4e1a-ad04-16ccb88bf8fb"
+
+4. Tampilkan Event Stream yang Sedang Disinkronkan di Redis:
+   kubectl exec -n indibank deploy/redis -- redis-cli lrange indibank:events:recent 0 1
+
+
+--------------------------------------------------------------------------------
+C. PEMBUKTIAN APACHE KAFKA (KRaft Broker & Event Streaming)
+--------------------------------------------------------------------------------
+
+1. Periksa Topik Kafka Aktif Langsung dari Broker:
+   kubectl exec -n indibank deploy/kafka -- /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list
+
+   Output:
+   __consumer_offsets
+   bank.fraud.alerts
+   bank.transfers.dlq
+   bank.transfers.settled
+
+2. Baca Pesan Settlement Langsung dari Topik Kafka (Console Consumer):
+   kubectl exec -n indibank deploy/kafka -- /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic bank.transfers.settled --from-beginning --max-messages 1
+
+   Contoh Payload Output:
+   {"eventId":"7d20832b-ef9c-4a9a-b8e9-1f6f8157b595","eventType":"TRANSFER_SETTLED","transferReference":"TRX-20260924-082445-4901","idempotencyKey":"e6517487-1931-4e1a-ad04-16ccb88bf8fb","sourceAccountNumber":"1001002001","destinationAccountNumber":"1001002002","amount":1.5E8,"currency":"IDR","settledAt":"2026-09-24T08:24:45.253154Z"}
+
+3. Baca Pesan Anti-Money Laundering (AML) Alert dari Kafka:
+   kubectl exec -n indibank deploy/kafka -- /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic bank.fraud.alerts --from-beginning --max-messages 1
+
+   Contoh Payload Output:
+   {"alertId":"d27d5775-1509-404c-8dd2-9238e4c9446a","alertType":"HIGH_VALUE_TRANSACTION","severity":"CRITICAL","transferReference":"TRX-20260924-082445-4901","triggerReason":"Transfer amount IDR 150000000.00 exceeds high-value reporting threshold of IDR 100000000"}
+
+
+================================================================================
+BAGIAN 3: VERIFIKASI OTOMATIS END-TO-END (ALL-IN-ONE SCRIPT)
+================================================================================
+Untuk menjalankan seluruh 7 skenario perbankan dan verifikasi integrasi
+secara otomatis dalam 1 perintah:
+
+./test-scenarios.sh https://indibank.aldianapps.com
+================================================================================
