@@ -125,26 +125,6 @@ spec:
             periodSeconds: 15
 ---
 # =====================================================================
-# Production Service - Directs traffic to Active Slot (Blue or Green)
-# =====================================================================
-apiVersion: v1
-kind: Service
-metadata:
-  name: indibank-core
-  namespace: indibank
-  labels:
-    app: indibank-core
-spec:
-  type: ClusterIP
-  ports:
-    - port: 8080
-      targetPort: 8080
-      name: http
-  selector:
-    app: indibank-core
-    slot: blue
----
-# =====================================================================
 # Preview Environment Deployment (Feature Branches / test.indibank)
 # =====================================================================
 apiVersion: apps/v1
@@ -234,7 +214,10 @@ metadata:
 data:
   Caddyfile: |
     indibank.aldianapps.com {
-        reverse_proxy indibank-core:8080
+        reverse_proxy indibank-core:8080 {
+            lb_try_duration 5s
+            lb_try_interval 250ms
+        }
     }
 
     test.indibank.aldianapps.com {
