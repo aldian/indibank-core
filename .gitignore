@@ -44,3 +44,7 @@ terraform.rc
 ### OS ###
 .DS_Store
 Thumbs.db
+
+### Private Guides & Presentation Assets ###
+docs/BUKTI_PENGGUNAAN_TEKNOLOGI.txt
+docs/presentation/
