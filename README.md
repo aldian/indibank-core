@@ -16,7 +16,7 @@
 
 ### 🌐 Live Public Endpoints & Contracts
 * **Interactive Banking Dashboard:** [https://indibank.aldianapps.com](https://indibank.aldianapps.com)  
-  *(Allows interviewers to execute live transfers, test idempotency replays, view real-time balance updates, and observe the live Kafka stream ticker).*
+  *(Allows evaluators and developers to execute live transfers, test idempotency replays, view real-time balance updates, and observe the live Kafka stream ticker).*
 * **Interactive Swagger / OpenAPI UI:** [https://indibank.aldianapps.com/swagger-ui.html](https://indibank.aldianapps.com/swagger-ui.html)
 * **Automated CI/CD Pipeline:** [`.github/workflows/ci-cd.yml`](./.github/workflows/ci-cd.yml)
 * **Multi-Platform Deployment Guide:** [`docs/deployment/MULTI_PLATFORM.md`](./docs/deployment/MULTI_PLATFORM.md)
