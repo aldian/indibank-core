@@ -1,0 +1,81 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: oracle-pvc
+  namespace: indibank
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 15Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: oracle-db
+  namespace: indibank
+  labels:
+    app: oracle-db
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: oracle-db
+  template:
+    metadata:
+      labels:
+        app: oracle-db
+    spec:
+      initContainers:
+        - name: fix-permissions
+          image: busybox
+          command: ["sh", "-c", "chown -R 54321:54321 /opt/oracle/oradata && chmod -R 777 /opt/oracle/oradata"]
+          volumeMounts:
+            - name: oracle-storage
+              mountPath: /opt/oracle/oradata
+      containers:
+        - name: oracle
+          image: gvenzl/oracle-free:slim
+          ports:
+            - containerPort: 1521
+              name: oracle-port
+          env:
+            - name: ORACLE_PASSWORD
+              value: "IndiBank2026!"
+            - name: APP_USER
+              value: "indibank"
+            - name: APP_USER_PASSWORD
+              value: "IndiBank2026!"
+          resources:
+            requests:
+              cpu: "300m"
+              memory: "1500Mi"
+            limits:
+              cpu: "1500m"
+              memory: "2500Mi"
+          volumeMounts:
+            - name: oracle-storage
+              mountPath: /opt/oracle/oradata
+      volumes:
+        - name: oracle-storage
+          persistentVolumeClaim:
+            claimName: oracle-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: oracle-db
+  namespace: indibank
+  labels:
+    app: oracle-db
+spec:
+  type: ClusterIP
+  ports:
+    - port: 1521
+      targetPort: 1521
+      name: oracle-port
+  selector:
+    app: oracle-db

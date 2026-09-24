@@ -1,0 +1,16 @@
+apiVersion: v2
+name: indibank
+description: Enterprise Core Banking Transaction & Ledger Engine Helm Chart
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - banking
+  - core-banking
+  - ledger
+  - kafka
+  - redis
+  - oracle
+maintainers:
+  - name: IndiBank Core Engineering
+    email: engineering@indibank.com

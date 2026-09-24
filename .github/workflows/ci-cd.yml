@@ -1,0 +1,201 @@
+name: IndiBank CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, 'feature/**' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  REGISTRY_HOST: asia-southeast2-docker.pkg.dev
+  IMAGE_NAME: asia-southeast2-docker.pkg.dev/aldianfazrihady/indibank-repo/indibank-engine
+
+jobs:
+  # =====================================================================
+  # 1. Quality & Spec Verification with Strict 95% Coverage Barrier
+  # =====================================================================
+  test:
+    name: Build & Verify 95% Coverage Barrier
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up OpenJDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'maven'
+
+      - name: Run Unit Tests & Verify JaCoCo Coverage (Threshold >= 95%)
+        run: mvn clean test jacoco:check
+
+      - name: Upload JaCoCo Coverage Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: jacoco-coverage-report
+          path: target/site/jacoco/
+          retention-days: 7
+
+      - name: Package Spring Boot Executable JAR
+        run: mvn package -DskipTests
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: indibank-jar
+          path: target/indibank-core-*.jar
+          retention-days: 1
+
+  # =====================================================================
+  # 2. Ephemeral Preview Deployment (Feature Branches -> test.indibank.aldianapps.com)
+  # =====================================================================
+  preview-deploy:
+    name: Deploy Feature Preview (test.indibank.aldianapps.com)
+    needs: test
+    if: startsWith(github.ref, 'refs/heads/feature/') && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Download Build Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: indibank-jar
+          path: target/
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          install_components: 'gke-gcloud-auth-plugin'
+
+      - name: Configure Docker Authentication
+        run: gcloud auth configure-docker ${{ env.REGISTRY_HOST }} --quiet
+
+      - name: Build & Push Preview Container Image
+        run: |
+          PREVIEW_TAG="${{ env.IMAGE_NAME }}:preview-${{ github.sha }}"
+          docker build -t "$PREVIEW_TAG" .
+          docker push "$PREVIEW_TAG"
+          echo "PREVIEW_IMAGE=$PREVIEW_TAG" >> $GITHUB_ENV
+
+      - name: Connect to GKE Cluster
+        run: |
+          gcloud container clusters get-credentials ${{ secrets.GKE_CLUSTER }} \
+            --zone ${{ secrets.GKE_ZONE }} \
+            --project ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Deploy to Preview Environment
+        run: |
+          kubectl apply -f k8s/namespace.yaml
+          kubectl apply -f k8s/app.yaml
+          
+          # Deploy candidate image to preview pod
+          kubectl set image deployment/indibank-core-preview app=${{ env.PREVIEW_IMAGE }} -n indibank
+          kubectl rollout status deployment/indibank-core-preview -n indibank --timeout=180s
+
+      - name: Report Preview URL
+        run: |
+          echo "### 🚀 Preview Environment Deployed!" >> $GITHUB_STEP_SUMMARY
+          echo "- **Preview URL**: [https://test.indibank.aldianapps.com](https://test.indibank.aldianapps.com)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch**: \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+
+  # =====================================================================
+  # 3. Production Zero-Downtime Blue-Green Deployment (main branch)
+  # =====================================================================
+  production-deploy:
+    name: Production Blue-Green Deploy (indibank.aldianapps.com)
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Download Build Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: indibank-jar
+          path: target/
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          install_components: 'gke-gcloud-auth-plugin'
+
+      - name: Configure Docker Authentication
+        run: gcloud auth configure-docker ${{ env.REGISTRY_HOST }} --quiet
+
+      - name: Build & Tag Container Image
+        run: |
+          IMAGE_TAG="${{ env.IMAGE_NAME }}:${{ github.sha }}"
+          IMAGE_LATEST="${{ env.IMAGE_NAME }}:latest"
+          
+          docker build -t "$IMAGE_TAG" -t "$IMAGE_LATEST" .
+          docker push "$IMAGE_TAG"
+          docker push "$IMAGE_LATEST"
+          echo "RELEASE_IMAGE=$IMAGE_TAG" >> $GITHUB_ENV
+
+      - name: Connect to GKE Cluster
+        run: |
+          gcloud container clusters get-credentials ${{ secrets.GKE_CLUSTER }} \
+            --zone ${{ secrets.GKE_ZONE }} \
+            --project ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Execute Blue-Green Cutover
+        run: |
+          kubectl apply -f k8s/namespace.yaml
+          kubectl apply -f k8s/oracle.yaml
+          kubectl apply -f k8s/redis.yaml
+          kubectl apply -f k8s/kafka.yaml
+          kubectl apply -f k8s/app.yaml
+
+          # Step A: Identify current active slot (blue or green)
+          ACTIVE_SLOT=$(kubectl get service indibank-core -n indibank -o jsonpath='{.spec.selector.slot}')
+          echo "Current Active Slot: $ACTIVE_SLOT"
+
+          if [ "$ACTIVE_SLOT" == "blue" ]; then
+            TARGET_SLOT="green"
+            OLD_SLOT="blue"
+          else
+            TARGET_SLOT="blue"
+            OLD_SLOT="green"
+          fi
+
+          echo "Target Standby Slot to Deploy: $TARGET_SLOT"
+
+          # Step B: Scale target deployment to 1 replica with new image
+          kubectl scale deployment/indibank-core-$TARGET_SLOT --replicas=1 -n indibank
+          kubectl set image deployment/indibank-core-$TARGET_SLOT app=${{ env.RELEASE_IMAGE }} -n indibank
+          kubectl rollout status deployment/indibank-core-$TARGET_SLOT -n indibank --timeout=180s
+
+          # Step C: Atomic traffic switch to new version (Zero Downtime)
+          kubectl patch service indibank-core -n indibank -p "{\"spec\":{\"selector\":{\"slot\":\"$TARGET_SLOT\"}}}"
+          echo "Production traffic successfully cut over to $TARGET_SLOT"
+
+          # Step E: Graceful decommission of old slot
+          sleep 10
+          kubectl scale deployment/indibank-core-$OLD_SLOT --replicas=0 -n indibank
+          echo "Scaled down former slot $OLD_SLOT"
+
+      - name: Live Smoke Test
+        run: |
+          echo "Validating live production health: https://indibank.aldianapps.com/api/v1/accounts"
+          curl -f -s https://indibank.aldianapps.com/api/v1/accounts | jq .

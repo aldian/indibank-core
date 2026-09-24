@@ -1,0 +1,27 @@
+# Overrides for local testing on Minikube / Kind
+targetPlatform: "local"
+
+app:
+  image:
+    repository: indibank-engine
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  service:
+    type: NodePort
+    nodePort: 30080
+
+oracle:
+  persistence:
+    enabled: true
+    storageClass: "standard" # standard on minikube or kind
+    size: 10Gi
+  resources:
+    requests:
+      cpu: 200m
+      memory: 1200Mi
+    limits:
+      cpu: 1000m
+      memory: 2000Mi
+
+ingress:
+  enabled: false # Use port-forwarding or NodePort 30080 locally

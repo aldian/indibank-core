@@ -1,0 +1,195 @@
+asyncapi: 3.0.0
+info:
+  title: IndiBank Core Event Streaming Specification
+  version: 1.0.0
+  description: |
+    Asynchronous event contracts for IndiBank Core Transaction and Ledger Engine.
+    Defines schemas for real-time Kafka event streaming:
+    - Settlement events
+    - AML / Fraud alerts (Rule: transfers > Rp 100,000,000)
+    - Dead-Letter Queues (DLQ) for poisoned messages
+
+defaultContentType: application/json
+
+channels:
+  bankTransfersSettled:
+    address: bank.transfers.settled
+    messages:
+      TransferSettledMessage:
+        $ref: '#/components/messages/TransferSettledMessage'
+    description: |
+      Emitted immediately after a transfer is committed to the Oracle ACID double-entry ledger.
+      Consumed by notification services, analytics pipelines, and the real-time fraud detector.
+
+  bankFraudAlerts:
+    address: bank.fraud.alerts
+    messages:
+      FraudAlertMessage:
+        $ref: '#/components/messages/FraudAlertMessage'
+    description: |
+      Emitted by the Fraud & AML Compliance Engine when high-value transfers (e.g. > 100,000,000 IDR)
+      or high-velocity account spikes are detected.
+
+  bankTransfersDlq:
+    address: bank.transfers.dlq
+    messages:
+      TransferDlqMessage:
+        $ref: '#/components/messages/TransferDlqMessage'
+    description: |
+      Dead Letter Queue topic capturing failed consumer processing events after maximum retry attempts.
+
+operations:
+  publishTransferSettled:
+    action: send
+    channel:
+      $ref: '#/channels/bankTransfersSettled'
+    summary: Publish settled transfer event to Kafka
+
+  subscribeTransferSettled:
+    action: receive
+    channel:
+      $ref: '#/channels/bankTransfersSettled'
+    summary: Consume settled transfer event for fraud screening and notification dispatch
+
+  publishFraudAlert:
+    action: send
+    channel:
+      $ref: '#/channels/bankFraudAlerts'
+    summary: Publish fraud / high-value compliance alert
+
+  subscribeFraudAlert:
+    action: receive
+    channel:
+      $ref: '#/channels/bankFraudAlerts'
+    summary: Consume compliance and risk monitoring alert
+
+components:
+  messages:
+    TransferSettledMessage:
+      name: TransferSettledEvent
+      title: Transfer Settled Event
+      summary: Event published upon successful double-entry ledger settlement
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/TransferSettledPayload'
+
+    FraudAlertMessage:
+      name: FraudAlertEvent
+      title: High-Value / Fraud Detection Alert
+      summary: Alert emitted when a transaction exceeds the AML risk threshold
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/FraudAlertPayload'
+
+    TransferDlqMessage:
+      name: TransferDlqEvent
+      title: Dead Letter Queue Message
+      summary: Dead letter message containing failed payload and failure stack trace
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/TransferDlqPayload'
+
+  schemas:
+    TransferSettledPayload:
+      type: object
+      required:
+        - eventId
+        - eventType
+        - transferReference
+        - sourceAccountNumber
+        - destinationAccountNumber
+        - amount
+        - currency
+        - settledAt
+      properties:
+        eventId:
+          type: string
+          format: uuid
+        eventType:
+          type: string
+          const: "TRANSFER_SETTLED"
+        transferReference:
+          type: string
+          example: "TRX-20260924-104921"
+        idempotencyKey:
+          type: string
+        sourceAccountNumber:
+          type: string
+          example: "1001002001"
+        destinationAccountNumber:
+          type: string
+          example: "1001002002"
+        amount:
+          type: number
+          example: 2500000.00
+        currency:
+          type: string
+          example: "IDR"
+        description:
+          type: string
+        settledAt:
+          type: string
+          format: date-time
+
+    FraudAlertPayload:
+      type: object
+      required:
+        - alertId
+        - alertType
+        - severity
+        - transferReference
+        - amount
+        - triggerReason
+        - detectedAt
+      properties:
+        alertId:
+          type: string
+          format: uuid
+        alertType:
+          type: string
+          enum: [HIGH_VALUE_TRANSACTION, RAPID_VELOCITY, DORMANT_ACCOUNT_ACTIVITY]
+          example: "HIGH_VALUE_TRANSACTION"
+        severity:
+          type: string
+          enum: [INFO, WARNING, CRITICAL]
+          example: "CRITICAL"
+        transferReference:
+          type: string
+          example: "TRX-20260924-104921"
+        sourceAccountNumber:
+          type: string
+        destinationAccountNumber:
+          type: string
+        amount:
+          type: number
+          example: 125000000.00
+        currency:
+          type: string
+          example: "IDR"
+        triggerReason:
+          type: string
+          example: "Transfer amount exceeds single-transaction threshold of IDR 100,000,000"
+        detectedAt:
+          type: string
+          format: date-time
+
+    TransferDlqPayload:
+      type: object
+      required:
+        - failedTopic
+        - originalPayload
+        - exceptionMessage
+        - retryCount
+        - failedAt
+      properties:
+        failedTopic:
+          type: string
+        originalPayload:
+          type: string
+        exceptionMessage:
+          type: string
+        retryCount:
+          type: integer
+        failedAt:
+          type: string
+          format: date-time

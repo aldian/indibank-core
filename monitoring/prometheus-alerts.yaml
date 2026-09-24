@@ -1,0 +1,83 @@
+# ==============================================================================
+# Prometheus Alerting Rules for IndiBank Core Engine
+# ==============================================================================
+groups:
+  - name: indibank_core_alerts
+    rules:
+      # 1. Availability SLI: High 5xx Error Rate
+      - alert: HighTransferErrorRate
+        expr: |
+          sum(rate(http_server_requests_seconds_count{uri="/api/v1/transfers",status=~"5.."}[5m]))
+          /
+          sum(rate(http_server_requests_seconds_count{uri="/api/v1/transfers"}[5m])) > 0.001
+        for: 2m
+        labels:
+          severity: critical
+          service: indibank-core
+          tier: transaction-engine
+        annotations:
+          summary: "IndiBank transfer 5xx error rate exceeds 0.1% (SLO breached)"
+          description: "High error rate detected in fund transfer endpoint. Immediate triage required."
+          runbook: "docs/sre/SRE_FRAMEWORK.md#sop-01-high-5xx-error-rate--unhandled-banking-exceptions"
+
+      # 2. Latency SLI: p95 Latency SLO Violation (> 150ms)
+      - alert: TransferLatencyP95Exceeded
+        expr: |
+          histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{uri="/api/v1/transfers"}[5m])) by (le)) > 0.150
+        for: 5m
+        labels:
+          severity: warning
+          service: indibank-core
+        annotations:
+          summary: "Transfer p95 latency exceeds 150ms SLO"
+          description: "p95 settlement latency is {{ $value }}s over the last 5 minutes."
+
+      # 3. Latency SLI: p99 Latency SLO Violation (> 500ms)
+      - alert: TransferLatencyP99Exceeded
+        expr: |
+          histogram_quantile(0.99, sum(rate(http_server_requests_seconds_bucket{uri="/api/v1/transfers"}[5m])) by (le)) > 0.500
+        for: 3m
+        labels:
+          severity: critical
+          service: indibank-core
+        annotations:
+          summary: "Transfer p99 latency exceeds 500ms critical threshold"
+          description: "p99 settlement latency is {{ $value }}s, indicating severe database or lock contention."
+
+      # 4. Saturation: Oracle DB Connection Pool Saturated
+      - alert: OracleDatabaseConnectionPoolSaturated
+        expr: |
+          hikaricp_connections_pending{pool="HikariPool-1"} > 0
+        for: 30s
+        labels:
+          severity: critical
+          service: indibank-core
+        annotations:
+          summary: "HikariCP database pool has queued pending threads"
+          description: "Oracle DB pool is starved. Threads are blocked waiting for database connections."
+
+      # 5. Saturation: Kafka Consumer Lag High (AML Fraud Screening)
+      - alert: KafkaConsumerLagHigh
+        expr: |
+          sum(kafka_consumer_fetch_manager_records_lag{group="indibank-fraud-detector"}) by (topic) > 500
+        for: 1m
+        labels:
+          severity: warning
+          service: indibank-core
+        annotations:
+          summary: "Kafka fraud detector consumer lag > 500 records"
+          description: "AML fraud screening consumer is falling behind settlement event production."
+          runbook: "docs/sre/SRE_FRAMEWORK.md#sop-02-kafka-consumer-lag--aml-worker-stall"
+
+      # 6. Concurrency: High Distributed Lock Contention (409 Spikes)
+      - alert: HighLockContentionSpike
+        expr: |
+          sum(rate(http_server_requests_seconds_count{uri="/api/v1/transfers",status="409"}[5m])) > 5
+        for: 1m
+        labels:
+          severity: warning
+          service: indibank-core
+        annotations:
+          summary: "High rate of HTTP 409 State Conflict / Lock Contention"
+          description: "Multiple concurrent transactions targeting the same account or duplicate idempotency keys."
+          runbook: "docs/sre/SRE_FRAMEWORK.md#sop-03-stuck-distributed-locks-redis-contention-spike"
