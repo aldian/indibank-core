@@ -11,6 +11,7 @@
 | :--- | :--- | :--- | :--- |
 | **Slide PowerPoint (ID)** | `.pptx` (16:9 Widescreen) | [`docs/presentation/IndiBank_Core_Architecture_Presentation_ID.pptx`](./IndiBank_Core_Architecture_Presentation_ID.pptx) | Slide deck berbahasa Indonesia dengan catatan presenter (speaker notes) lengkap di setiap slide. Siap diunggah ke Google Slides. |
 | **Slide PowerPoint (EN)** | `.pptx` (16:9 Widescreen) | [`docs/presentation/IndiBank_Core_Architecture_Presentation_EN.pptx`](./IndiBank_Core_Architecture_Presentation_EN.pptx) | Slide deck berbahasa Inggris dengan speaker notes lengkap di setiap slide. |
+| **Panduan Demo Langsung (Bilingual)** | Markdown | [`docs/presentation/DEMO_SCRIPT.md`](./DEMO_SCRIPT.md) | Panduan langkah-demi-langkah demonstrasi live sistem 6 menit, lengkap dengan aksi layar, narasi presenter, dan fail-safe CLI. |
 | **Web Slides Interaktif (Bilingual)** | `.html` (Standalone) | [`docs/presentation/slides.html`](./slides.html) | Presentasi web interaktif dengan tombol toggle instan bahasa [EN / ID], navigasi keyboard panah, dan panel catatan presenter (`S`). |
 | **Generator Skrip Python** | Python (`python-pptx`) | [`docs/presentation/build_deck.py`](./build_deck.py) | Generator otomatis untuk membuild slide presentasi dalam kedua bahasa secara serempak. |
 
