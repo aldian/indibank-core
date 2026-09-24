@@ -1,0 +1,448 @@
+openapi: 3.1.0
+info:
+  title: IndiBank Core Transaction & Ledger API
+  description: |
+    Core Banking Interbank Fund Transfer & Ledger Management API.
+    Designed for high throughput, strict idempotency, double-entry financial integrity, and event-driven settlement.
+  version: 1.0.0
+  contact:
+    name: IndiBank Core Platform Engineering
+    email: platform-eng@aldianapps.com
+
+servers:
+  - url: https://indibank.aldianapps.com
+    description: Production GKE Environment
+  - url: http://localhost:8080
+    description: Local Development Environment
+
+tags:
+  - name: Transfers
+    description: Interbank & Intra-bank Fund Transfer Operations
+  - name: Accounts
+    description: Account Balances and Immutable Ledger Statements
+  - name: System
+    description: Health Checks & Operational Telemetry
+
+paths:
+  /api/v1/transfers:
+    post:
+      tags:
+        - Transfers
+      summary: Initiate an Idempotent Fund Transfer
+      description: |
+        Processes a real-time fund transfer between two accounts with strict idempotency and distributed locking.
+        Generates double-entry journal entries in Oracle DB, publishes settlement events to Kafka, and invalidates Redis balance cache.
+      operationId: initiateTransfer
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: Unique client-generated UUID to prevent duplicate transaction execution on network retries.
+          schema:
+            type: string
+            format: uuid
+            example: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+        - name: X-Correlation-ID
+          in: header
+          required: false
+          description: End-to-end distributed tracing identifier.
+          schema:
+            type: string
+            example: "trace-20260924-001"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransferRequest'
+      responses:
+        '201':
+          description: Transfer executed and settled successfully
+          headers:
+            Idempotency-Key:
+              schema:
+                type: string
+              description: Echo of the idempotency key processed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransferResponse'
+        '200':
+          description: Idempotent replay: returns original transfer response without double debiting
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransferResponse'
+        '400':
+          description: Invalid request parameters or missing required fields
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: Conflict / Duplicate request currently in-flight
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '422':
+          description: Business logic error (e.g. Insufficient Funds, Account Inactive, Transfer to same account)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: Internal banking engine error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+  /api/v1/transfers/{referenceNumber}:
+    get:
+      tags:
+        - Transfers
+      summary: Query Transfer by Reference Number
+      description: Retrieves transaction status, double-entry journal references, and settlement timestamps.
+      operationId: getTransferByReference
+      parameters:
+        - name: referenceNumber
+          in: path
+          required: true
+          description: Transaction reference (e.g. TRX-20260924-XXXXXX)
+          schema:
+            type: string
+            example: "TRX-20260924-104921"
+      responses:
+        '200':
+          description: Transfer record details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransferResponse'
+        '404':
+          description: Transfer not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+  /api/v1/accounts:
+    get:
+      tags:
+        - Accounts
+      summary: List All Active Demo Accounts
+      description: Returns accounts available for demoing transfers.
+      operationId: listAccounts
+      responses:
+        '200':
+          description: List of bank accounts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AccountSummary'
+
+  /api/v1/accounts/{accountNumber}/balance:
+    get:
+      tags:
+        - Accounts
+      summary: Retrieve Cached Account Balance
+      description: |
+        Returns the real-time balance for an account. Fast-read cached in Redis with write-through/invalidation on ledger updates.
+      operationId: getAccountBalance
+      parameters:
+        - name: accountNumber
+          in: path
+          required: true
+          description: Unique 10-digit bank account number
+          schema:
+            type: string
+            example: "1001002001"
+      responses:
+        '200':
+          description: Account balance summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountBalanceResponse'
+        '404':
+          description: Account not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+  /api/v1/accounts/{accountNumber}/statement:
+    get:
+      tags:
+        - Accounts
+      summary: Query Account Statement (Double-Entry Journal Entries)
+      description: |
+        Returns immutable double-entry ledger journal lines (DEBIT/CREDIT) for the specified account from Oracle DB.
+      operationId: getAccountStatement
+      parameters:
+        - name: accountNumber
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "1001002001"
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        '200':
+          description: Immutable journal line history
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountStatementResponse'
+        '404':
+          description: Account not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+  /api/v1/events/recent:
+    get:
+      tags:
+        - System
+      summary: Query Recent Kafka Stream Events (Demo Inspection)
+      description: |
+        Returns in-memory snapshot of recent Kafka events received by the consumer (settled transfers, fraud alerts, DLQ retries).
+      operationId: getRecentEvents
+      responses:
+        '200':
+          description: Recent Kafka event messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StreamEvent'
+
+components:
+  schemas:
+    TransferRequest:
+      type: object
+      required:
+        - sourceAccountNumber
+        - destinationAccountNumber
+        - amount
+        - currency
+      properties:
+        sourceAccountNumber:
+          type: string
+          pattern: '^[0-9]{10}$'
+          example: "1001002001"
+          description: 10-digit origin account number
+        destinationAccountNumber:
+          type: string
+          pattern: '^[0-9]{10}$'
+          example: "1001002002"
+          description: 10-digit recipient account number
+        amount:
+          type: number
+          format: double
+          minimum: 1000.00
+          maximum: 500000000.00
+          example: 2500000.00
+          description: Transfer amount (minimum IDR 1,000)
+        currency:
+          type: string
+          enum: [IDR]
+          default: IDR
+          example: "IDR"
+        description:
+          type: string
+          maxLength: 140
+          example: "Payment for Invoice #INV-2026-09"
+
+    TransferResponse:
+      type: object
+      required:
+        - referenceNumber
+        - status
+        - sourceAccountNumber
+        - destinationAccountNumber
+        - amount
+        - currency
+        - createdAt
+      properties:
+        referenceNumber:
+          type: string
+          example: "TRX-20260924-104921"
+        idempotencyKey:
+          type: string
+          example: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+        status:
+          type: string
+          enum: [SETTLED, PENDING, FAILED]
+          example: "SETTLED"
+        sourceAccountNumber:
+          type: string
+          example: "1001002001"
+        destinationAccountNumber:
+          type: string
+          example: "1001002002"
+        amount:
+          type: number
+          example: 2500000.00
+        currency:
+          type: string
+          example: "IDR"
+        description:
+          type: string
+          example: "Payment for Invoice #INV-2026-09"
+        journalEntryId:
+          type: integer
+          example: 1042
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-09-24T10:49:21Z"
+
+    AccountSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        accountNumber:
+          type: string
+          example: "1001002001"
+        accountHolderName:
+          type: string
+          example: "Budi Santoso (Corporate PT)"
+        accountType:
+          type: string
+          enum: [CHECKING, SAVINGS, SETTLEMENT_CLEARING]
+          example: "CHECKING"
+        currency:
+          type: string
+          example: "IDR"
+        balance:
+          type: number
+          example: 750000000.00
+        status:
+          type: string
+          enum: [ACTIVE, DORMANT, FROZEN]
+          example: "ACTIVE"
+
+    AccountBalanceResponse:
+      type: object
+      properties:
+        accountNumber:
+          type: string
+          example: "1001002001"
+        accountHolderName:
+          type: string
+          example: "Budi Santoso (Corporate PT)"
+        balance:
+          type: number
+          example: 750000000.00
+        currency:
+          type: string
+          example: "IDR"
+        cached:
+          type: boolean
+          example: true
+          description: Whether response was served from Redis cache
+        lastUpdated:
+          type: string
+          format: date-time
+          example: "2026-09-24T10:49:21Z"
+
+    AccountStatementResponse:
+      type: object
+      properties:
+        accountNumber:
+          type: string
+          example: "1001002001"
+        currentBalance:
+          type: number
+          example: 750000000.00
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/JournalLine'
+
+    JournalLine:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1042
+        transferReference:
+          type: string
+          example: "TRX-20260924-104921"
+        entryType:
+          type: string
+          enum: [DEBIT, CREDIT]
+          example: "DEBIT"
+        amount:
+          type: number
+          example: 2500000.00
+        balanceAfter:
+          type: number
+          example: 747500000.00
+        description:
+          type: string
+          example: "Fund transfer to 1001002002"
+        timestamp:
+          type: string
+          format: date-time
+          example: "2026-09-24T10:49:21Z"
+
+    StreamEvent:
+      type: object
+      properties:
+        topic:
+          type: string
+          example: "bank.transfers.settled"
+        partition:
+          type: integer
+          example: 0
+        offset:
+          type: integer
+          example: 42
+        key:
+          type: string
+          example: "TRX-20260924-104921"
+        payload:
+          type: object
+        timestamp:
+          type: string
+          format: date-time
+
+    ApiError:
+      type: object
+      required:
+        - status
+        - code
+        - message
+        - timestamp
+      properties:
+        status:
+          type: integer
+          example: 422
+        code:
+          type: string
+          example: "INSUFFICIENT_FUNDS"
+        message:
+          type: string
+          example: "Source account has insufficient available balance for transfer."
+        details:
+          type: string
+          example: "Available balance: 1,500,000.00 IDR, Requested: 2,500,000.00 IDR"
+        timestamp:
+          type: string
+          format: date-time
+          example: "2026-09-24T10:49:21Z"
