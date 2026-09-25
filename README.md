@@ -241,8 +241,4 @@ http://localhost:8080/swagger-ui.html
 ./test-scenarios.sh http://localhost:8080
 ```
 
----
 
-## 9. Author & Maintainer
-* **IndiBank Platform Engineering Team**  
-* Project: IndiBank Core Transaction & Ledger Engine
