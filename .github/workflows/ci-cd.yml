@@ -104,6 +104,13 @@ jobs:
               --from-literal=PREVIEW_DOMAIN="${{ secrets.PREVIEW_DOMAIN }}" \
               --dry-run=client -o yaml | kubectl apply -f -
           fi
+          if [ -n "${{ secrets.DB_PASSWORD }}" ]; then
+            kubectl create secret generic oracle-db-secret -n indibank \
+              --from-literal=ORACLE_PASSWORD="${{ secrets.DB_PASSWORD }}" \
+              --from-literal=APP_USER_PASSWORD="${{ secrets.DB_PASSWORD }}" \
+              --from-literal=SPRING_DATASOURCE_PASSWORD="${{ secrets.DB_PASSWORD }}" \
+              --dry-run=client -o yaml | kubectl apply -f -
+          fi
           kubectl apply -f k8s/app.yaml
           
           # Deploy candidate image to preview pod
@@ -174,6 +181,13 @@ jobs:
             kubectl create secret generic indibank-domains -n indibank \
               --from-literal=APP_DOMAIN="${{ secrets.PROD_DOMAIN }}" \
               --from-literal=PREVIEW_DOMAIN="${{ secrets.PREVIEW_DOMAIN }}" \
+              --dry-run=client -o yaml | kubectl apply -f -
+          fi
+          if [ -n "${{ secrets.DB_PASSWORD }}" ]; then
+            kubectl create secret generic oracle-db-secret -n indibank \
+              --from-literal=ORACLE_PASSWORD="${{ secrets.DB_PASSWORD }}" \
+              --from-literal=APP_USER_PASSWORD="${{ secrets.DB_PASSWORD }}" \
+              --from-literal=SPRING_DATASOURCE_PASSWORD="${{ secrets.DB_PASSWORD }}" \
               --dry-run=client -o yaml | kubectl apply -f -
           fi
           kubectl apply -f k8s/oracle.yaml
