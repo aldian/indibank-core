@@ -149,9 +149,30 @@ helm install indibank ./helm/indibank \
 
 ---
 
-## 5. Google Cloud Platform (GCP GKE) Reference
+## 5. Google Cloud Platform (GCP GKE)
 
-Reference deployment setup for Google Kubernetes Engine (GKE):
-* **Dashboard:** Accessible at `http://localhost:8080` (or configured ingress domain)
-* **Provisioned with:** `terraform/` (Google Provider)
+### 1. Provision GKE with Terraform
+```bash
+cd terraform/gcp
+terraform init
+terraform apply -auto-approve
+```
+
+### 2. Push Image to Google Artifact Registry
+```bash
+gcloud auth configure-docker asia-southeast2-docker.pkg.dev
+docker tag indibank-engine:latest asia-southeast2-docker.pkg.dev/<PROJECT_ID>/indibank-repo/indibank-engine:latest
+docker push asia-southeast2-docker.pkg.dev/<PROJECT_ID>/indibank-repo/indibank-engine:latest
+```
+
+### 3. Deploy via Helm or Automated CI/CD
+```bash
+# Connect kubectl to GKE
+gcloud container clusters get-credentials indibank-cluster --region asia-southeast2
+
+# Deploy via Helm
+helm upgrade --install indibank ./helm/indibank \
+  -f ./helm/indibank/values.yaml \
+  --namespace indibank --create-namespace
+```
 * **Continuous Deployment:** Handled automatically via `.github/workflows/ci-cd.yml` on push to `main`.
