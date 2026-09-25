@@ -43,7 +43,7 @@ public class DataInitializer implements CommandLineRunner {
                             .build(),
                     Account.builder()
                             .accountNumber("1001002003")
-                            .accountHolderName("Indivara Corporate Treasury")
+                            .accountHolderName("IndiBank Corporate Treasury")
                             .accountType(AccountType.CHECKING)
                             .currency("IDR")
                             .balance(new BigDecimal("1250000000.00"))
