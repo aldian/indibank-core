@@ -153,17 +153,29 @@
                         <div class="col-6">
                             <label class="form-label fw-semibold small text-muted">Source Account</label>
                             <select class="form-select form-select-sm" id="sourceAccount" required>
-                                <option value="1001002001">1001002001 - Budi Santoso</option>
-                                <option value="1001002003">1001002003 - Indivara Treasury</option>
-                                <option value="1001002002">1001002002 - Siti Rahma</option>
+                                <optgroup label="Customer Accounts">
+                                    <option value="1001002001" selected>1001002001 - Budi Santoso</option>
+                                    <option value="1001002002">1001002002 - Siti Rahma</option>
+                                    <option value="1001002003">1001002003 - IndiBank Corporate Treasury</option>
+                                    <option value="1001002004">1001002004 - Ahmad Hidayat</option>
+                                </optgroup>
+                                <optgroup label="Interbank Settlement GL">
+                                    <option value="1001002099">1001002099 - National Clearing Settlement GL</option>
+                                </optgroup>
                             </select>
                         </div>
                         <div class="col-6">
                             <label class="form-label fw-semibold small text-muted">Destination Account</label>
                             <select class="form-select form-select-sm" id="destAccount" required>
-                                <option value="1001002002">1001002002 - Siti Rahma</option>
-                                <option value="1001002001">1001002001 - Budi Santoso</option>
-                                <option value="1001002004">1001002004 - Ahmad Hidayat</option>
+                                <optgroup label="Customer Accounts">
+                                    <option value="1001002002" selected>1001002002 - Siti Rahma</option>
+                                    <option value="1001002001">1001002001 - Budi Santoso</option>
+                                    <option value="1001002003">1001002003 - IndiBank Corporate Treasury</option>
+                                    <option value="1001002004">1001002004 - Ahmad Hidayat</option>
+                                </optgroup>
+                                <optgroup label="Interbank Settlement GL">
+                                    <option value="1001002099">1001002099 - National Clearing Settlement GL</option>
+                                </optgroup>
                             </select>
                         </div>
                     </div>
@@ -324,6 +336,50 @@
                 `;
                 tbody.appendChild(tr);
             });
+
+            // Dynamically refresh dropdown options while preserving user selection
+            const sourceSelect = document.getElementById('sourceAccount');
+            const destSelect = document.getElementById('destAccount');
+            const currentSource = sourceSelect.value || '1001002001';
+            const currentDest = destSelect.value || '1001002002';
+
+            const custGroupSrc = document.createElement('optgroup');
+            custGroupSrc.label = 'Customer Accounts';
+            const glGroupSrc = document.createElement('optgroup');
+            glGroupSrc.label = 'Interbank Settlement GL';
+
+            const custGroupDst = document.createElement('optgroup');
+            custGroupDst.label = 'Customer Accounts';
+            const glGroupDst = document.createElement('optgroup');
+            glGroupDst.label = 'Interbank Settlement GL';
+
+            data.forEach(acc => {
+                const optSrc = document.createElement('option');
+                optSrc.value = acc.accountNumber;
+                optSrc.textContent = `${acc.accountNumber} - ${acc.accountHolderName}`;
+                if (acc.accountNumber === currentSource) optSrc.selected = true;
+
+                const optDst = document.createElement('option');
+                optDst.value = acc.accountNumber;
+                optDst.textContent = `${acc.accountNumber} - ${acc.accountHolderName}`;
+                if (acc.accountNumber === currentDest) optDst.selected = true;
+
+                if (acc.accountType === 'SETTLEMENT_CLEARING') {
+                    glGroupSrc.appendChild(optSrc);
+                    glGroupDst.appendChild(optDst);
+                } else {
+                    custGroupSrc.appendChild(optSrc);
+                    custGroupDst.appendChild(optDst);
+                }
+            });
+
+            sourceSelect.innerHTML = '';
+            sourceSelect.appendChild(custGroupSrc);
+            if (glGroupSrc.children.length > 0) sourceSelect.appendChild(glGroupSrc);
+
+            destSelect.innerHTML = '';
+            destSelect.appendChild(custGroupDst);
+            if (glGroupDst.children.length > 0) destSelect.appendChild(glGroupDst);
         } catch (e) {
             console.error("Failed to load accounts", e);
         }
