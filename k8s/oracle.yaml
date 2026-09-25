@@ -44,11 +44,17 @@ spec:
               name: oracle-port
           env:
             - name: ORACLE_PASSWORD
-              value: "IndiBank2026!"
+              valueFrom:
+                secretKeyRef:
+                  name: oracle-db-secret
+                  key: ORACLE_PASSWORD
             - name: APP_USER
               value: "indibank"
             - name: APP_USER_PASSWORD
-              value: "IndiBank2026!"
+              valueFrom:
+                secretKeyRef:
+                  name: oracle-db-secret
+                  key: APP_USER_PASSWORD
           resources:
             requests:
               cpu: "300m"

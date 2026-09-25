@@ -5,9 +5,9 @@ services:
     ports:
       - "1521:1521"
     environment:
-      - ORACLE_PASSWORD=IndiBank2026!
+      - ORACLE_PASSWORD=indibank_dev
       - APP_USER=indibank
-      - APP_USER_PASSWORD=IndiBank2026!
+      - APP_USER_PASSWORD=indibank_dev
     volumes:
       - oracle-data:/opt/oracle/oradata
       - ./spec/database-schema.sql:/container-entrypoint-initdb.d/01_schema.sql
@@ -65,7 +65,7 @@ services:
     environment:
       - SPRING_DATASOURCE_URL=jdbc:oracle:thin:@//oracle-db:1521/FREEPDB1
       - SPRING_DATASOURCE_USERNAME=system
-      - SPRING_DATASOURCE_PASSWORD=IndiBank2026!
+      - SPRING_DATASOURCE_PASSWORD=indibank_dev
       - SPRING_DATA_REDIS_HOST=redis
       - SPRING_DATA_REDIS_PORT=6379
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092

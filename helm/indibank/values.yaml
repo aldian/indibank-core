@@ -23,7 +23,7 @@ oracle:
   image:
     repository: gvenzl/oracle-free
     tag: "slim"
-  password: "IndiBank2026!"
+  password: "indibank_dev"
   persistence:
     enabled: true
     size: 15Gi
