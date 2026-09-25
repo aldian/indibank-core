@@ -24,12 +24,12 @@ public class OpenApiConfig {
                         .contact(new Contact()
                                 .name("IndiBank Core Engineering")
                                 .email("engineering@indibank.com")
-                                .url("https://indibank.aldianapps.com"))
+                                .url("https://indibank.example.com"))
                         .license(new License()
                                 .name("Apache 2.0")
                                 .url("https://www.apache.org/licenses/LICENSE-2.0")))
                 .servers(List.of(
-                        new Server().url("https://indibank.aldianapps.com").description("Production GKE Environment"),
+                        new Server().url("/").description("Current Server"),
                         new Server().url("http://localhost:8080").description("Local Development Environment")
                 ));
     }

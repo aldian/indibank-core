@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # IndiBank Core Transaction & Ledger Engine - Automated Test Scenarios
-# Runs end-to-end verification against https://indibank.aldianapps.com
+# Runs end-to-end verification against configured target URL (default: http://localhost:8080)
 # ==============================================================================
 
 set -e
 
-BASE_URL="${1:-https://indibank.aldianapps.com}"
+BASE_URL="${1:-http://localhost:8080}"
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 BLUE='\033[0;34m'

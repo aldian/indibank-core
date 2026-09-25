@@ -116,7 +116,7 @@ flowchart TD
     kubectl patch service indibank-core -n indibank -p '{"spec":{"selector":{"slot":"blue"}}}'
     ```
 * **Ephemeral Feature Previews:**
-  * Every feature branch builds an isolated preview pod accessible at `https://test.indibank.aldianapps.com`.
+  * Every feature branch builds an isolated preview pod accessible at the configured preview domain.
   * Manual and automated exploratory testing is completed in preview before merging to `main`.
 * **Zero Direct Push to `main`:**
   * Enforced via GitHub Branch Protection (`enforce_admins: true`) with a mandatory $\ge 95\%$ JaCoCo test coverage gate.
@@ -126,7 +126,7 @@ flowchart TD
 ## 6. Incident Response Standard Operating Procedures (SOPs)
 
 ### SOP-01: High 5xx Error Rate / Unhandled Banking Exceptions
-1. **Assess Impact:** Check live dashboard (`https://indibank.aldianapps.com`) and Prometheus `/actuator/metrics`.
+1. **Assess Impact:** Check live dashboard (`http://localhost:8080` or configured ingress) and Prometheus `/actuator/metrics`.
 2. **Inspect Logs:**
    ```bash
    kubectl logs -n indibank -l app=indibank-core --tail=100 | grep -E "ERROR|Exception"

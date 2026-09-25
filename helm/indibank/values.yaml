@@ -72,7 +72,7 @@ ingress:
   className: "gce"
   annotations: {}
   hosts:
-    - host: indibank.aldianapps.com
+    - host: indibank.example.com
       paths:
         - path: /
           pathType: ImplementationSpecific

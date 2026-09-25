@@ -7,13 +7,11 @@ info:
   version: 1.0.0
   contact:
     name: IndiBank Core Platform Engineering
-    email: platform-eng@aldianapps.com
+    email: platform-eng@indibank.example.com
 
 servers:
-  - url: https://indibank.aldianapps.com
-    description: Production GKE Blue-Green Environment
-  - url: https://test.indibank.aldianapps.com
-    description: Ephemeral Feature Preview Environment
+  - url: /
+    description: Current Server
   - url: http://localhost:8080
     description: Local Development Environment
 
