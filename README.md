@@ -245,5 +245,4 @@ http://localhost:8080/swagger-ui.html
 
 ## 9. Author & Maintainer
 * **IndiBank Platform Engineering Team**  
-* Email: [engineering@indibank.com](mailto:engineering@indibank.com)  
 * Project: IndiBank Core Transaction & Ledger Engine

@@ -7,7 +7,6 @@ info:
   version: 1.0.0
   contact:
     name: IndiBank Core Platform Engineering
-    email: platform-eng@indibank.example.com
 
 servers:
   - url: /

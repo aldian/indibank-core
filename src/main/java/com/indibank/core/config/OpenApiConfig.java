@@ -22,9 +22,7 @@ public class OpenApiConfig {
                         .description("High-Throughput Core Banking Interbank Fund Transfer & Event-Driven Ledger System.\n" +
                                 "Showcases Java 21, Apache Kafka, Redis, and Oracle DB.")
                         .contact(new Contact()
-                                .name("IndiBank Core Engineering")
-                                .email("engineering@indibank.com")
-                                .url("https://indibank.example.com"))
+                                .name("IndiBank Core Engineering"))
                         .license(new License()
                                 .name("Apache 2.0")
                                 .url("https://www.apache.org/licenses/LICENSE-2.0")))
