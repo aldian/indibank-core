@@ -5,8 +5,6 @@ info:
     Core Banking Interbank Fund Transfer & Ledger Management API.
     Designed for high throughput, strict idempotency, double-entry financial integrity, and event-driven settlement.
   version: 1.0.0
-  contact:
-    name: IndiBank Core Platform Engineering
 
 servers:
   - url: /
