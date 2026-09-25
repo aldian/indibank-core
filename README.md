@@ -1,6 +1,6 @@
 # IndiBank Core Transaction & Ledger Engine
 > **High-Throughput Digital Banking Ledger Engine** built with **Spec-Driven Development (SDD)**  
-> **Tech Stack:** Java 21 • Spring Boot 3.3 • Apache Kafka • Redis 7 • Oracle DB 23c • Kubernetes (GKE) • Terraform
+> **Tech Stack:** Java 21 • Spring Boot 3.3 • Apache Kafka • Redis 7 • Oracle DB 23c • Kubernetes • Terraform
 
 [![CI/CD Pipeline](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-2088FF?style=for-the-badge&logo=githubactions)](./.github/workflows/ci-cd.yml)
 [![Swagger UI](https://img.shields.io/badge/API%20Docs-Swagger%20UI-orange?style=for-the-badge&logo=swagger)](http://localhost:8080/swagger-ui.html)
@@ -37,8 +37,8 @@
 | **System of Record** | **Oracle Database 23c Free** | **Immutable Financial Ledger**: ACID compliance, strict **Double-Entry Bookkeeping** (every transaction creates equal DEBIT and CREDIT journal lines), non-negative constraints (`balance >= 0`), and optimistic locking (`@Version`). |
 | **Concurrency Guard** | **Redis 7 (In-Memory Data Store)** | **Distributed Performance & Safety**: Strict **Idempotency Key Engine** (`SETNX` + TTL) preventing duplicate transfers, **Distributed Locks** on sender accounts mitigating race conditions, and **Fast-Path Balance Caching**. |
 | **Event Streaming** | **Apache Kafka 3.7+ (KRaft Mode)** | **Asynchronous Decoupling**: Event-driven settlement notifications (`bank.transfers.settled`), real-time **AML Fraud Detection** (`bank.fraud.alerts` flagging transfers > Rp 100M), and Dead-Letter Queueing (`bank.transfers.dlq`). |
-| **Container Platform** | **Kubernetes (Google Kubernetes Engine - GKE)** | Container orchestration running with dedicated PVC storage for Oracle DB and auto-healing pods. |
-| **Infrastructure as Code** | **Terraform (HashiCorp)** | Fully declarative provisioning of the GKE cluster, Artifact Registry, and regional static ingress IP address. |
+| **Container Platform** | **Kubernetes (Cloud-Agnostic / CNCF Conformant)** | Container orchestration running with dedicated PVC storage for Oracle DB, horizontal autoscaling (HPA), and zero-downtime rolling updates across any Kubernetes environment (EKS, AKS, GKE, OpenShift, On-Prem). |
+| **Infrastructure as Code** | **Terraform (HashiCorp)** | Modular, multi-cloud declarative infrastructure provisioning across major cloud providers (AWS, Azure, GCP). |
 
 ---
 
@@ -151,18 +151,18 @@ indibank-core/
 │   ├── values-openshift.yaml      # Red Hat OpenShift (Route & SCC) values
 │   └── templates/                 # Deployments, Services, PVCs, Ingress, OpenShift Route
 ├── terraform/                     # Multi-Cloud Infrastructure as Code (IaC)
-│   ├── main.tf                    # GCP GKE Cluster, Artifact Registry, Static IP
+│   ├── main.tf                    # GCP Cluster, Artifact Registry, Static IP
 │   ├── variables.tf               # GCP Region & cluster settings
 │   ├── aws/main.tf                # AWS EKS Cluster (Jakarta ap-southeast-3), VPC, ECR
 │   └── azure/main.tf              # Azure AKS Cluster (Indonesia Central), VNet, ACR
-├── k8s/                           # Production Kubernetes Manifests (GKE)
+├── k8s/                           # Production Kubernetes Manifests
 │   ├── namespace.yaml             # 'indibank' namespace
 │   ├── oracle.yaml                # Oracle 23c Free Deployment, PVC, Service
 │   ├── redis.yaml                 # Redis 7 Deployment & Service
 │   ├── kafka.yaml                 # Apache Kafka KRaft Deployment & Service
 │   └── app.yaml                   # Spring Boot Deployment & Caddy TLS Gateway
 ├── .github/workflows/
-│   └── ci-cd.yml                  # Automated GitHub Actions CI (Java 21) & CD (GKE)
+│   └── ci-cd.yml                  # Automated GitHub Actions CI/CD Pipeline
 ├── docs/deployment/
 │   └── MULTI_PLATFORM.md          # Multi-Platform (Minikube, OpenShift, AWS, Azure, GCP) Guide
 ├── src/                           # Java 21 Spring Boot Application
