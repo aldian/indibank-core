@@ -51,10 +51,10 @@ jobs:
           retention-days: 1
 
   # =====================================================================
-  # 2. Ephemeral Preview Deployment (Feature Branches -> test.indibank.aldianapps.com)
+  # 2. Ephemeral Preview Deployment (Feature Branches)
   # =====================================================================
   preview-deploy:
-    name: Deploy Feature Preview (test.indibank.aldianapps.com)
+    name: Deploy Feature Preview (Ephemeral Environment)
     needs: test
     if: startsWith(github.ref, 'refs/heads/feature/') && github.event_name == 'push'
     runs-on: ubuntu-latest
@@ -98,6 +98,12 @@ jobs:
       - name: Deploy to Preview Environment
         run: |
           kubectl apply -f k8s/namespace.yaml
+          if [ -n "${{ secrets.PROD_DOMAIN }}" ]; then
+            kubectl create secret generic indibank-domains -n indibank \
+              --from-literal=APP_DOMAIN="${{ secrets.PROD_DOMAIN }}" \
+              --from-literal=PREVIEW_DOMAIN="${{ secrets.PREVIEW_DOMAIN }}" \
+              --dry-run=client -o yaml | kubectl apply -f -
+          fi
           kubectl apply -f k8s/app.yaml
           
           # Deploy candidate image to preview pod
@@ -107,7 +113,9 @@ jobs:
       - name: Report Preview URL
         run: |
           echo "### 🚀 Preview Environment Deployed!" >> $GITHUB_STEP_SUMMARY
-          echo "- **Preview URL**: [https://test.indibank.aldianapps.com](https://test.indibank.aldianapps.com)" >> $GITHUB_STEP_SUMMARY
+          if [ -n "${{ secrets.PREVIEW_DOMAIN }}" ]; then
+            echo "- **Preview URL**: [https://${{ secrets.PREVIEW_DOMAIN }}](https://${{ secrets.PREVIEW_DOMAIN }})" >> $GITHUB_STEP_SUMMARY
+          fi
           echo "- **Branch**: \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Commit**: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
 
@@ -115,7 +123,7 @@ jobs:
   # 3. Production Zero-Downtime Blue-Green Deployment (main branch)
   # =====================================================================
   production-deploy:
-    name: Production Blue-Green Deploy (indibank.aldianapps.com)
+    name: Production Blue-Green Deploy (Zero-Downtime)
     needs: test
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
@@ -162,6 +170,12 @@ jobs:
       - name: Execute Blue-Green Cutover
         run: |
           kubectl apply -f k8s/namespace.yaml
+          if [ -n "${{ secrets.PROD_DOMAIN }}" ]; then
+            kubectl create secret generic indibank-domains -n indibank \
+              --from-literal=APP_DOMAIN="${{ secrets.PROD_DOMAIN }}" \
+              --from-literal=PREVIEW_DOMAIN="${{ secrets.PREVIEW_DOMAIN }}" \
+              --dry-run=client -o yaml | kubectl apply -f -
+          fi
           kubectl apply -f k8s/oracle.yaml
           kubectl apply -f k8s/redis.yaml
           kubectl apply -f k8s/kafka.yaml
@@ -207,6 +221,12 @@ jobs:
           echo "Scaled down former slot $OLD_SLOT"
 
       - name: Live Smoke Test
+        env:
+          PROD_URL: ${{ secrets.PROD_URL }}
         run: |
-          echo "Validating live production health: https://indibank.aldianapps.com/api/v1/accounts"
-          curl -f -s https://indibank.aldianapps.com/api/v1/accounts | jq .
+          if [ -n "$PROD_URL" ]; then
+            echo "Validating live production health: $PROD_URL/api/v1/accounts"
+            curl -f -s "$PROD_URL/api/v1/accounts" | jq .
+          else
+            echo "No PROD_URL secret configured, skipping live smoke test."
+          fi

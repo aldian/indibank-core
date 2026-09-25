@@ -149,9 +149,9 @@ helm install indibank ./helm/indibank \
 
 ---
 
-## 5. Google Cloud Platform (GCP GKE) - Live Reference
+## 5. Google Cloud Platform (GCP GKE) Reference
 
-The current live deployment is hosted on GKE in Jakarta (`asia-southeast2`):
-* **Live Dashboard:** [https://indibank.aldianapps.com](https://indibank.aldianapps.com)
+Reference deployment setup for Google Kubernetes Engine (GKE):
+* **Dashboard:** Accessible at `http://localhost:8080` (or configured ingress domain)
 * **Provisioned with:** `terraform/` (Google Provider)
 * **Continuous Deployment:** Handled automatically via `.github/workflows/ci-cd.yml` on push to `main`.

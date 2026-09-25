@@ -11,13 +11,13 @@ resource "google_artifact_registry_repository" "indibank_repo" {
   format        = "DOCKER"
 }
 
-# 2. Static External IP for Domain Ingress (indibank.aldianapps.com)
+# 2. Static External IP for Domain Ingress
 resource "google_compute_address" "indibank_static_ip" {
   name   = "indibank-static-ip"
   region = var.region
 }
 
-# 3. GKE Cluster Definition (Standard Zonal Cluster in Jakarta)
+# 3. GKE Cluster Definition
 resource "google_container_cluster" "primary" {
   name     = var.cluster_name
   location = var.zone

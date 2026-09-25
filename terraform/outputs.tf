@@ -14,6 +14,6 @@ output "artifact_registry_repo" {
 }
 
 output "ingress_static_ip" {
-  description = "Static IP allocated for indibank.aldianapps.com"
+  description = "Static IP allocated for domain ingress"
   value       = google_compute_address.indibank_static_ip.address
 }
