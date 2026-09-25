@@ -47,7 +47,7 @@
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Client as Digital Channel / Mobile Banking
+    actor Client as Client / API Consumer (Web UI, API Gateway, CLI)
     participant API as Spring Boot 3 (Java 21)
     participant Redis as Redis 7 (Guard & Lock)
     participant Oracle as Oracle DB 23c (ACID Ledger)
@@ -87,7 +87,7 @@ sequenceDiagram
         alt Transfer Amount >= Rp 100,000,000
             AML->>Kafka: Publish CRITICAL Alert to bank.fraud.alerts
         end
-        AML->>Client: Dispatch simulated SMS / Push Notification
+        AML-->>Kafka: Log & Dispatch Compliance Alert
     end
 ```
 

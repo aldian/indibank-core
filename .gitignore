@@ -41,9 +41,12 @@ override.tf.json
 .terraformrc
 terraform.rc
 
-### OS ###
+### OS & Editors ###
 .DS_Store
 Thumbs.db
+*.swp
+.*.swp
+*~
 
 ### Private Guides & Presentation Assets ###
 docs/BUKTI_PENGGUNAAN_TEKNOLOGI.txt
