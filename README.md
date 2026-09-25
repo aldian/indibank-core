@@ -151,10 +151,9 @@ indibank-core/
 │   ├── values-openshift.yaml      # Red Hat OpenShift (Route & SCC) values
 │   └── templates/                 # Deployments, Services, PVCs, Ingress, OpenShift Route
 ├── terraform/                     # Multi-Cloud Infrastructure as Code (IaC)
-│   ├── main.tf                    # GCP Cluster, Artifact Registry, Static IP
-│   ├── variables.tf               # GCP Region & cluster settings
-│   ├── aws/main.tf                # AWS EKS Cluster (Jakarta ap-southeast-3), VPC, ECR
-│   └── azure/main.tf              # Azure AKS Cluster (Indonesia Central), VNet, ACR
+│   ├── gcp/                       # GCP GKE Cluster (Jakarta asia-southeast2), Artifact Registry, Static IP
+│   ├── aws/                       # AWS EKS Cluster (Jakarta ap-southeast-3), VPC, ECR
+│   └── azure/                     # Azure AKS Cluster (Indonesia Central), VNet, ACR
 ├── k8s/                           # Production Kubernetes Manifests
 │   ├── namespace.yaml             # 'indibank' namespace
 │   ├── oracle.yaml                # Oracle 23c Free Deployment, PVC, Service
