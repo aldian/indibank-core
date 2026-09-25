@@ -2,7 +2,7 @@
 > **High-Throughput Digital Banking Ledger Engine** built with **Spec-Driven Development (SDD)**  
 > **Tech Stack:** Java 21 • Spring Boot 3.3 • Apache Kafka • Redis 7 • Oracle DB 23c • Kubernetes (GKE) • Terraform
 
-[![CI/CD Pipeline](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-2088FF?style=for-the-badge&logo=githubactions)](https://github.com/aldian/indibank-core/actions)
+[![CI/CD Pipeline](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-2088FF?style=for-the-badge&logo=githubactions)](./.github/workflows/ci-cd.yml)
 [![Swagger UI](https://img.shields.io/badge/API%20Docs-Swagger%20UI-orange?style=for-the-badge&logo=swagger)](http://localhost:8080/swagger-ui.html)
 [![Multi-Platform](https://img.shields.io/badge/Deploy-GCP%20%7C%20AWS%20%7C%20Azure%20%7C%20OpenShift%20%7C%20Local-9cf?style=for-the-badge&logo=helm)](./docs/deployment/MULTI_PLATFORM.md)
 [![Java 21](https://img.shields.io/badge/Java-21%20LTS-red?style=for-the-badge&logo=openjdk)](https://openjdk.org/projects/jdk/21/)

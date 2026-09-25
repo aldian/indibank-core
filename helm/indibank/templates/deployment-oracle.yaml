@@ -36,7 +36,7 @@ spec:
       initContainers:
         - name: fix-permissions
           image: busybox
-          command: ["sh", "-c", "chown -R 54321:54321 /opt/oracle/oradata && chmod -R 777 /opt/oracle/oradata"]
+          command: ["sh", "-c", "chown -R 54321:54321 /opt/oracle/oradata && chmod -R 750 /opt/oracle/oradata"]
           volumeMounts:
             - name: oracle-storage
               mountPath: /opt/oracle/oradata

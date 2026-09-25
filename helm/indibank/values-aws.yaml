@@ -3,7 +3,7 @@ targetPlatform: "aws"
 
 app:
   image:
-    repository: 818954087576.dkr.ecr.ap-southeast-3.amazonaws.com/indibank-engine
+    repository: 123456789012.dkr.ecr.ap-southeast-3.amazonaws.com/indibank-engine
     tag: "latest"
   service:
     type: NodePort
@@ -23,7 +23,6 @@ ingress:
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
     alb.ingress.kubernetes.io/ssl-redirect: '443'
   hosts:
-    - host: indibank.example.com
-      paths:
+    - paths:
         - path: /
           pathType: Prefix

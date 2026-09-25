@@ -50,3 +50,14 @@ docs/BUKTI_PENGGUNAAN_TEKNOLOGI.txt
 docs/PANDUAN_KONEKSI_LAPTOP_LAIN.txt
 docs/*.txt
 docs/presentation/
+
+### Secrets & Credentials ###
+*.env
+*.env.*
+*.key
+*.pem
+*.pfx
+*.pkcs12
+service-account*.json
+credentials*.json
+

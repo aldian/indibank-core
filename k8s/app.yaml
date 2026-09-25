@@ -23,7 +23,7 @@ spec:
     spec:
       containers:
         - name: app
-          image: asia-southeast2-docker.pkg.dev/aldianfazrihady/indibank-repo/indibank-engine:v1
+          image: indibank-engine:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
@@ -89,7 +89,7 @@ spec:
     spec:
       containers:
         - name: app
-          image: asia-southeast2-docker.pkg.dev/aldianfazrihady/indibank-repo/indibank-engine:v1
+          image: indibank-engine:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
@@ -152,7 +152,7 @@ spec:
     spec:
       containers:
         - name: app
-          image: asia-southeast2-docker.pkg.dev/aldianfazrihady/indibank-repo/indibank-engine:v1
+          image: indibank-engine:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
@@ -300,7 +300,6 @@ metadata:
     app: indibank-gateway
 spec:
   type: LoadBalancer
-  loadBalancerIP: "34.128.89.142"
   ports:
     - port: 80
       targetPort: 80
