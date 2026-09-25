@@ -18,7 +18,6 @@ ingress:
   annotations:
     appgw.ingress.kubernetes.io/ssl-redirect: "true"
   hosts:
-    - host: indibank.example.com
-      paths:
+    - paths:
         - path: /
           pathType: Prefix

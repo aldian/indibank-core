@@ -4,9 +4,9 @@ targetPlatform: "kubernetes" # kubernetes, openshift, local
 app:
   replicaCount: 1
   image:
-    repository: asia-southeast2-docker.pkg.dev/aldianfazrihady/indibank-repo/indibank-engine
+    repository: indibank-engine
     tag: "latest"
-    pullPolicy: Always
+    pullPolicy: IfNotPresent
   service:
     type: ClusterIP
     port: 8080
